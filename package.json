@@ -1,0 +1,32 @@
+{
+  "name": "trading-bot-ai",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write src",
+    "typecheck": "tsc --noEmit",
+    "bot": "npx tsx bot/trading-bot.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "dotenv": "^17.4.1",
+    "lightweight-charts": "^4.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "prettier": "^3.8.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1",
+    "vitest": "^4.1.4"
+  }
+}

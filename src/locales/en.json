@@ -1,0 +1,172 @@
+{
+  "topbar": {
+    "title": "TRADING BOT AI"
+  },
+  "mode": {
+    "label": "Mode",
+    "trading": "Trading",
+    "backtesting": "Backtesting"
+  },
+  "pairs": {
+    "label": "Pairs",
+    "noneSelected": "No pairs selected",
+    "multiSelected": "{{count}} pairs selected"
+  },
+  "period": {
+    "label": "Period"
+  },
+  "dateShifter": {
+    "label": "End Date",
+    "now": "Now"
+  },
+  "interval": {
+    "label": "Interval"
+  },
+  "algo": {
+    "label": "Algorithm",
+    "autoGrid": "Auto Grid"
+  },
+  "autoGridControls": {
+    "stepPrice": "Level Step $",
+    "amountPerLevel": "Amount per level $",
+    "compounding": "Compounding",
+    "pendingBuys": "Pending buys",
+    "maxTotalSlots": "Max total slots",
+    "maxGridDepth": "Max grid depth",
+    "topCutThreshold": "Top cut at N owned (0=off)",
+    "lockedLevels": "Locked levels",
+    "maxDropSteps": "Max drop streak",
+    "steps": "steps",
+    "simProfit": "Realized",
+    "simRoiOnCapital": "ROI on capital",
+    "simRequiredCapital": "Required capital",
+    "simMaxCapital": "Max capital",
+    "simCycles": "Cycles",
+    "simOpenEnd": "Open at end",
+    "simMaxOpen": "Peak slots",
+    "simPeakOwned": "Peak owned",
+    "simUnrealized": "Unrealized",
+    "simNet": "Net",
+    "simBagCost": "Bag cost",
+    "simBagValue": "Bag value",
+    "levelOccupancy": "Level occupancy"
+  },
+  "srControls": {
+    "seriesLength": "Series Length",
+    "minAvgStep": "Min Avg Step %",
+    "tpRatio": "TP Ratio %",
+    "slRatio": "SL Ratio %",
+    "maxHold": "Max Hold"
+  },
+  "initialAmount": {
+    "label": "Initial Amount ($)"
+  },
+  "trading": {
+    "apiKey": "API Key",
+    "apiSecret": "API Secret",
+    "start": "Start Trading",
+    "stop": "Stop Trading",
+    "status": "Status",
+    "idle": "Idle",
+    "running": "Running",
+    "stopping": "Stopping...",
+    "log": "Activity Log",
+    "noLog": "No activity yet",
+    "pair": "Pair",
+    "baseEntry": "Base entry",
+    "levelFilled": "Level filled",
+    "tpPlaced": "TP placed",
+    "tpFilled": "TP filled — cycle complete",
+    "slFilled": "SL filled — cycle complete",
+    "cycleRestart": "New cycle started",
+    "error": "Error",
+    "connected": "Connected to Kraken",
+    "disconnected": "Not connected"
+  },
+  "dipControls": {
+    "dropPct": "Drop %",
+    "dropWindow": "Window (candles)",
+    "higherLow": "Higher Low Confirm",
+    "exitRatio": "SL Ratio %",
+    "trailDistance": "Trail Distance %",
+    "maxHold": "Max Hold",
+    "trendDirection": "Trend Direction"
+  },
+  "levelsEditor": {
+    "level": "L",
+    "pct": "%",
+    "amount": "Amount %",
+    "add": "+ Add Level",
+    "remove": "×"
+  },
+  "cache": {
+    "clear": "Clear Cache",
+    "cleared": "Cache cleared"
+  },
+  "actions": {
+    "loadData": "Load Data",
+    "loading": "Loading...",
+    "runBacktest": "Run Backtest",
+    "simulate": "Simulate"
+  },
+  "simulation": {
+    "title": "Simulation Results",
+    "tp": "TP %",
+    "sl": "SL %",
+    "drop": "Drop %",
+    "dropWin": "Drop W",
+    "trades": "Trades",
+    "winRate": "Win %",
+    "return": "Return %",
+    "drawdown": "DD %",
+    "running": "Running simulation...",
+    "noResults": "No results. Load data and run simulation.",
+    "apply": "Apply"
+  },
+  "chart": {
+    "title": "Chart",
+    "selectPair": "Select a pair to begin.",
+    "noData": "No data loaded",
+    "noDataHint": "Configure your settings and press Load Data"
+  },
+  "metrics": {
+    "title": "Metrics",
+    "placeholder": "Run a backtest to see metrics",
+    "totalTrades": "Total Trades",
+    "winRate": "Win Rate",
+    "totalReturn": "Total Return",
+    "avgTrade": "Avg Trade",
+    "maxDrawdown": "Max Drawdown",
+    "tpExits": "TP Exits",
+    "slExits": "SL Exits",
+    "mhExits": "MH Exits"
+  },
+  "earningsChart": {
+    "title": "Strategy Performance",
+    "placeholder": "Run a backtest to see earnings"
+  },
+  "priceLineChart": {
+    "title": "Price & SMA",
+    "placeholder": "Load data to see price"
+  },
+  "holdChart": {
+    "title": "Price",
+    "placeholder": "Load data to see price"
+  },
+  "trades": {
+    "title": "Trades",
+    "placeholder": "Run a backtest to see trades",
+    "noTrades": "No trades were generated.",
+    "entryTime": "Entry",
+    "exitTime": "Exit",
+    "entryPrice": "Entry Price",
+    "exitPrice": "Exit Price",
+    "tradeAmount": "Trade Amount",
+    "pnl": "PnL ($)",
+    "pnlPercent": "Trade PnL %",
+    "balance": "Balance",
+    "quantity": "Quantity",
+    "duration": "Duration",
+    "detailTitle": "Trade Details"
+  }
+}
