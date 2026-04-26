@@ -1,9 +1,9 @@
 import { Mode } from '../../constants/global.constants';
 import { useTradingContext } from '../../context/TradingContext';
 import BacktestingView from '../BacktestingView/BacktestingView';
-import TradingView from '../TradingView/TradingView';
+import BotStatus from '../BotStatus/BotStatus';
 
 export default function MainView() {
   const { mode } = useTradingContext();
-  return mode === Mode.Backtesting ? <BacktestingView /> : <TradingView />;
+  return mode === Mode.Backtesting ? <BacktestingView /> : <BotStatus />;
 }

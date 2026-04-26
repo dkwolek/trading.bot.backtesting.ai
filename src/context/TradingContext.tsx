@@ -2,27 +2,9 @@ import { createContext, ReactNode, useContext, useEffect, useRef, useState } fro
 import { useChartData } from '../hooks/useChartData';
 import { useSimulation } from '../hooks/useSimulation';
 import { useTradingSettings } from '../hooks/useTradingSettings';
-import { usePersistedState } from '../hooks/usePersistedState';
 import { runBacktest as runBacktestService } from '../services/backtesting';
 import { BacktestResult } from '../types/algo.types';
 import { TradingContextValue } from './TradingContext.types';
-import {
-  TradingSignalConfig,
-  TRADING_SIGNAL_DEFAULTS,
-} from '../components/Sidebar/TradingControls/TradingControls';
-
-const SIGNAL_CONFIG_KEY = 'trading-bot-ai:signalConfig';
-
-function isTradingSignalConfig(value: unknown): value is TradingSignalConfig {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'dropPct' in value &&
-    'dropWindow' in value &&
-    'higherLow' in value &&
-    'trendDir' in value
-  );
-}
 
 const TradingContext = createContext<TradingContextValue | null>(null);
 
@@ -34,11 +16,6 @@ export function TradingProvider({ children }: Props) {
   const settings = useTradingSettings();
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
   const simulation = useSimulation();
-  const [signalConfig, setSignalConfig] = usePersistedState<TradingSignalConfig>(
-    SIGNAL_CONFIG_KEY,
-    TRADING_SIGNAL_DEFAULTS,
-    isTradingSignalConfig
-  );
 
   const {
     candles,
@@ -60,7 +37,6 @@ export function TradingProvider({ children }: Props) {
     fetchData();
   }
 
-  // Auto-load when data settings change
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -98,8 +74,6 @@ export function TradingProvider({ children }: Props) {
         runBacktest,
         simulationResults: simulation.results,
         isSimulating: simulation.isSimulating,
-        signalConfig,
-        setSignalConfig,
         simulationProgress: simulation.progress,
         runSimulation,
       }}

@@ -3,7 +3,6 @@ import { Algorithm, AlgoOptions, AlgoOptionValue, BacktestResult } from '../type
 import { Candle } from '../types/global.types';
 import { AutoGridSimulationResult } from '../services/simulation';
 import { AutoGridSimulationGrid } from '../types/simulation.types';
-import { TradingSignalConfig } from '../components/Sidebar/TradingControls/TradingControls';
 
 export interface TradingContextValue {
   mode: Mode;
@@ -33,6 +32,4 @@ export interface TradingContextValue {
   isSimulating: boolean;
   simulationProgress: number;
   runSimulation: (autoGridGrid?: AutoGridSimulationGrid) => void;
-  signalConfig: TradingSignalConfig;
-  setSignalConfig: (config: TradingSignalConfig) => void;
 }
