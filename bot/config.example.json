@@ -1,9 +1,0 @@
-{
-  "pair": "ETHUSDC",
-  "amountPerLevel": 10,
-  "stepPrice": 25,
-  "pendingBuys": 2,
-  "maxTotalSlots": 10,
-  "maxGridDepth": 10,
-  "pollIntervalMs": 10000
-}
