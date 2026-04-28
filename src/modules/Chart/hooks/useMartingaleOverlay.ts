@@ -119,6 +119,12 @@ export function useMartingaleOverlay(
     // time without mixing into the main close-line series.
     const lockedSeries: ISeriesApi<'Line'>[] = [];
     for (const [levelIndex, openedAt] of lockedOpenedAt) {
+      // Skip levels opened on the final candle — both points would share
+      // the same timestamp and lightweight-charts asserts strict ascending
+      // order. A zero-width band has nothing meaningful to draw anyway.
+      if (openedAt >= finalCandle.time) {
+        continue;
+      }
       const linePrice = levelIndex * stepPrice;
       const lockSeries = chart.addLineSeries({
         color: LOCKED_LINE_COLOR,

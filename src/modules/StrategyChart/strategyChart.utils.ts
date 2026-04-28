@@ -18,13 +18,18 @@ export function buildStrategyLineData(
     return [];
   }
 
-  // Pre-compute balance after each trade, sorted by exit time
+  // Pre-compute balance after each trade, sorted by exit time. Additive
+  // (not multiplicative) to match the Realized metric — every trade
+  // deploys a fixed `capitalPerSlot`, profits are not re-invested into
+  // bigger trades. Compounding `balance * deployedFraction * pnlPercent`
+  // produced absurd 5-figure totals once cycle counts hit 4-5 digits.
+  const capitalPerSlot = totalSlots > 0 ? initialAmount / totalSlots : initialAmount;
   const sortedTrades = [...trades].sort((tradeA, tradeB) => tradeA.exitTime - tradeB.exitTime);
   const exitBalances: { time: number; balance: number }[] = [];
   let balance = initialAmount;
   for (const trade of sortedTrades) {
-    const deployedFraction = trade.quantity / totalSlots;
-    balance += balance * deployedFraction * (trade.pnlPercent / 100);
+    const dollarPnl = capitalPerSlot * trade.quantity * (trade.pnlPercent / 100);
+    balance += dollarPnl;
     exitBalances.push({ time: trade.exitTime, balance });
   }
 
