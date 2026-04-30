@@ -37,6 +37,8 @@ export enum Period {
   TWENTY_FOUR_MONTHS = '24M',
   THIRTY_SIX_MONTHS = '36M',
   FORTY_EIGHT_MONTHS = '48M',
+  SIXTY_MONTHS = '60M',
+  SEVENTY_TWO_MONTHS = '72M',
 }
 
 export enum Interval {

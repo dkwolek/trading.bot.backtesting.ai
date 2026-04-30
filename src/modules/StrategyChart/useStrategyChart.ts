@@ -1,22 +1,25 @@
 import { ColorType, createChart, IChartApi, IPriceLine, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
-import { Trade } from '../../types/algo.types';
+import { RealizedSnapshot } from '../../algos/auto-grid.algo';
 import { Candle } from '../../types/global.types';
 import { buildStrategyLineData } from './strategyChart.utils';
 
+const PRIMARY_COLOR = '#3b82f6';
+const COMPARISON_COLOR = '#a78bfa';
+
 export function useStrategyChart(
   candles: Candle[] | undefined,
-  trades: Trade[] | undefined,
-  initialAmount: number,
-  totalSlots: number
+  primaryHistory: RealizedSnapshot[],
+  comparisonHistory: RealizedSnapshot[] | null,
+  initialAmount: number
 ) {
   const chartPaneRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const primarySeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const comparisonSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
   const hasCandles = candles && candles.length > 0;
 
-  // Create chart instance (same pattern as PriceChart)
   useEffect(() => {
     if (!chartPaneRef.current || !hasCandles) {
       return;
@@ -42,14 +45,14 @@ export function useStrategyChart(
       handleScale: false,
     });
 
-    const series = chart.addLineSeries({
-      color: '#3b82f6',
+    const primary = chart.addLineSeries({
+      color: PRIMARY_COLOR,
       lineWidth: 2,
       priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
     });
 
     chartRef.current = chart;
-    seriesRef.current = series;
+    primarySeriesRef.current = primary;
 
     const observer = new ResizeObserver((entries) => {
       const { width } = entries[0].contentRect;
@@ -61,24 +64,54 @@ export function useStrategyChart(
     return () => {
       observer.disconnect();
       chart.remove();
+      chartRef.current = null;
+      primarySeriesRef.current = null;
+      comparisonSeriesRef.current = null;
     };
   }, [hasCandles]);
 
-  // Update data (same pattern as PriceChart)
+  // Add/remove the comparison series independently so toggling
+  // compounding doesn't tear down the whole chart.
   useEffect(() => {
-    if (!seriesRef.current || !candles || candles.length === 0) {
+    const chart = chartRef.current;
+    if (!chart) {
+      return;
+    }
+    if (comparisonHistory === null) {
+      if (comparisonSeriesRef.current) {
+        chart.removeSeries(comparisonSeriesRef.current);
+        comparisonSeriesRef.current = null;
+      }
+      return;
+    }
+    if (!comparisonSeriesRef.current) {
+      comparisonSeriesRef.current = chart.addLineSeries({
+        color: COMPARISON_COLOR,
+        lineWidth: 1,
+        lineStyle: 2,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      });
+    }
+  }, [comparisonHistory !== null]);
+
+  useEffect(() => {
+    if (!primarySeriesRef.current || !candles || candles.length === 0) {
       return;
     }
 
     if (priceLineRef.current) {
-      seriesRef.current.removePriceLine(priceLineRef.current);
+      primarySeriesRef.current.removePriceLine(priceLineRef.current);
     }
 
-    seriesRef.current.setData(
-      buildStrategyLineData(candles, trades ?? [], initialAmount, totalSlots)
-    );
+    primarySeriesRef.current.setData(buildStrategyLineData(candles, primaryHistory, initialAmount));
 
-    priceLineRef.current = seriesRef.current.createPriceLine({
+    if (comparisonSeriesRef.current && comparisonHistory) {
+      comparisonSeriesRef.current.setData(
+        buildStrategyLineData(candles, comparisonHistory, initialAmount)
+      );
+    }
+
+    priceLineRef.current = primarySeriesRef.current.createPriceLine({
       price: initialAmount,
       color: '#4a4a5a',
       lineWidth: 1,
@@ -88,7 +121,7 @@ export function useStrategyChart(
     });
 
     chartRef.current?.timeScale().fitContent();
-  }, [candles, trades, initialAmount, totalSlots]);
+  }, [candles, primaryHistory, comparisonHistory, initialAmount]);
 
   return { chartPaneRef, hasCandles };
 }

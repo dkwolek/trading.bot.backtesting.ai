@@ -1,23 +1,55 @@
+import { useMemo } from 'react';
 import { useTradingContext } from '../../context/TradingContext';
 import ChartLineIcon from '../../components/Icons/ChartLineIcon';
 import t from '../../locales';
-import { Trade } from '../../types/algo.types';
+import {
+  resolveAmountPerLevel,
+  resolveCompounding,
+  resolveStepPrice,
+  simulateAutoGrid,
+} from '../../algos/auto-grid.algo';
 import { Candle } from '../../types/global.types';
 import { useStrategyChart } from './useStrategyChart';
 
 interface Props {
-  trades?: Trade[];
   candles?: Candle[];
 }
 
-export default function StrategyChart({ trades, candles }: Props) {
+export default function StrategyChart({ candles }: Props) {
   const { initialAmount, algoOptions } = useTradingContext();
-  const mgAmount = algoOptions.autoGridAmountPerLevel;
-  const totalSlots =
-    typeof mgAmount === 'number' && mgAmount > 0 && initialAmount > 0
-      ? Math.max(1, initialAmount / mgAmount)
-      : 3;
-  const { chartPaneRef, hasCandles } = useStrategyChart(candles, trades, initialAmount, totalSlots);
+  const stepPrice = resolveStepPrice(algoOptions);
+  const amountPerLevel = resolveAmountPerLevel(algoOptions);
+  const compounding = resolveCompounding(algoOptions);
+
+  const histories = useMemo(() => {
+    if (!candles || candles.length === 0) {
+      return { primary: [], comparison: null };
+    }
+    const primary = simulateAutoGrid(candles, {
+      stepPrice,
+      amountPerLevel,
+      compounding,
+    }).realizedHistory;
+    if (!compounding) {
+      return { primary, comparison: null };
+    }
+    // When compounding is on, plot a dashed baseline showing what the
+    // same setup would produce with compounding off — quick visual on
+    // how much the bumps actually contribute.
+    const comparison = simulateAutoGrid(candles, {
+      stepPrice,
+      amountPerLevel,
+      compounding: false,
+    }).realizedHistory;
+    return { primary, comparison };
+  }, [candles, stepPrice, amountPerLevel, compounding]);
+
+  const { chartPaneRef, hasCandles } = useStrategyChart(
+    candles,
+    histories.primary,
+    histories.comparison,
+    initialAmount
+  );
 
   return (
     <div className="flex flex-col gap-2">

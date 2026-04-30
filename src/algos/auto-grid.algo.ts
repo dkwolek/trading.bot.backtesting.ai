@@ -8,6 +8,13 @@ const DEFAULT_STEP_PRICE = 25;
 const DEFAULT_AMOUNT_PER_LEVEL = 10;
 const DEFAULT_COMPOUNDING = false;
 
+// Each compound bump scales `amountPerLevel` by this fraction (10%) and
+// requires `levelCount * amountPerLevel * COMPOUND_RATIO` fresh realised
+// profit. Threshold scales with current size so each bump costs more to
+// earn — keeps the relative growth constant instead of fading out as
+// the +$1/level rule did once amountPerLevel got large.
+const COMPOUND_RATIO = 0.1;
+
 export const AUTO_GRID_STEP_PRICE_KEY = 'autoGridStepPrice';
 export const AUTO_GRID_AMOUNT_PER_LEVEL_KEY = 'autoGridAmountPerLevel';
 export const AUTO_GRID_COMPOUNDING_KEY = 'autoGridCompounding';
@@ -19,7 +26,7 @@ export const controls: ControlDef[] = [
     type: 'slider',
     defaultValue: DEFAULT_STEP_PRICE,
     min: 5,
-    max: 500,
+    max: 1000,
     step: 5,
     group: 'Levels',
   },
@@ -92,6 +99,16 @@ export interface AutoGridSimulation {
   endTime: number;
   signals: Signal[];
   compoundEvents: CompoundEvent[]; // when amountPerLevel was bumped
+  // Per-cycle snapshot of cumulative realised PnL — drives the strategy
+  // performance chart so it matches `totalProfit` exactly (including
+  // compounded amountPerLevel bumps that buildTrades/computeMetrics
+  // can't see, since they only carry pnlPercent).
+  realizedHistory: RealizedSnapshot[];
+}
+
+export interface RealizedSnapshot {
+  time: number;
+  cumulative: number;
 }
 
 interface OwnedSlot {
@@ -236,12 +253,14 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       endTime: 0,
       signals: [],
       compoundEvents: [],
+      realizedHistory: [],
     };
   }
 
   // Number of grid levels covered by the period's price range — drives
-  // the compounding threshold (`realized / levelCount >= 1` → bump
-  // amountPerLevel by $1).
+  // the compounding threshold: each bump needs `levelCount × current
+  // amountPerLevel × COMPOUND_RATIO` of fresh realised profit (i.e.
+  // enough to grow every level by the ratio).
   let rangeMinLow = Number.POSITIVE_INFINITY;
   let rangeMaxHigh = Number.NEGATIVE_INFINITY;
   for (const candle of candles) {
@@ -265,6 +284,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   let maxCapital = 0;
   const signals: Signal[] = [];
   const compoundEvents: CompoundEvent[] = [];
+  const realizedHistory: RealizedSnapshot[] = [];
 
   // We use the previous candle's close as the upper boundary for new
   // fills: a buy at level L fires only if price was above L at the end
@@ -292,6 +312,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
         const tpPrice = tpIndex * stepPrice;
         totalProfit += slot.volume * tpPrice - slot.cost;
         cycles += 1;
+        realizedHistory.push({ time: candle.time, cumulative: totalProfit });
         signals.push({
           time: slot.ownedAt,
           type: SignalType.Buy,
@@ -307,13 +328,19 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
         });
         owned.delete(levelIndex);
 
-        // Compounding: every $levelCount of fresh realised profit bumps
-        // amountPerLevel by $1. Multiple bumps can fire in a single
-        // cycle on big TPs.
+        // Compounding: scale `amountPerLevel` by COMPOUND_RATIO whenever
+        // realised profit covers the same ratio worth of grid coverage.
+        // Threshold uses the *current* amountPerLevel so each bump costs
+        // more to earn than the previous — relative growth stays
+        // constant instead of fading out at high amountPerLevel values.
         if (compounding) {
-          while (totalProfit - compoundedAmount >= levelCount) {
-            amountPerLevel += 1;
-            compoundedAmount += levelCount;
+          while (true) {
+            const threshold = levelCount * amountPerLevel * COMPOUND_RATIO;
+            if (totalProfit - compoundedAmount < threshold) {
+              break;
+            }
+            compoundedAmount += threshold;
+            amountPerLevel = amountPerLevel * (1 + COMPOUND_RATIO);
             compoundEvents.push({ time: candle.time, amountPerLevel });
           }
         }
@@ -394,6 +421,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     endTime: finalCandle.time,
     signals,
     compoundEvents,
+    realizedHistory,
   };
 }
 

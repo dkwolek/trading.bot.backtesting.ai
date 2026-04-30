@@ -18,6 +18,8 @@ const PERIOD_TO_MS: Record<Period, number> = {
   [Period.TWENTY_FOUR_MONTHS]: 730 * 86_400_000,
   [Period.THIRTY_SIX_MONTHS]: 1095 * 86_400_000,
   [Period.FORTY_EIGHT_MONTHS]: 1461 * 86_400_000,
+  [Period.SIXTY_MONTHS]: 1826 * 86_400_000,
+  [Period.SEVENTY_TWO_MONTHS]: 2191 * 86_400_000,
 };
 
 function pairToSymbol(pair: Pair): string {

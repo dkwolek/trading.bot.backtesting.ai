@@ -41,7 +41,7 @@ export default function BacktestingView() {
           )}
         </Collapsible>
         <Collapsible id="strategy" title={t.earningsChart.title}>
-          <StrategyChart trades={backtestResult?.trades} candles={candles} />
+          <StrategyChart candles={candles} />
         </Collapsible>
       </div>
       <TradesTable ref={tradesTableRef} trades={backtestResult?.trades} />
