@@ -4,8 +4,15 @@ import ChartLineIcon from '../../components/Icons/ChartLineIcon';
 import t from '../../locales';
 import {
   resolveAmountPerLevel,
+  resolveAtrMultiplier,
+  resolveAtrPeriod,
+  resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
+  resolveTrendEmaPeriod,
+  resolveTrendFilter,
+  resolveTrendRangeBandPct,
+  resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
 import { Candle } from '../../types/global.types';
@@ -20,6 +27,13 @@ export default function StrategyChart({ candles }: Props) {
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
   const compounding = resolveCompounding(algoOptions);
+  const trendFilter = resolveTrendFilter(algoOptions);
+  const trendEmaPeriod = resolveTrendEmaPeriod(algoOptions);
+  const trendRangeBandPct = resolveTrendRangeBandPct(algoOptions);
+  const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
+  const atrPeriod = resolveAtrPeriod(algoOptions);
+  const atrMultiplier = resolveAtrMultiplier(algoOptions);
+  const chaseAfterTp = resolveChaseAfterTp(algoOptions);
 
   const histories = useMemo(() => {
     if (!candles || candles.length === 0) {
@@ -29,20 +43,43 @@ export default function StrategyChart({ candles }: Props) {
       stepPrice,
       amountPerLevel,
       compounding,
+      trendFilter,
+      trendEmaPeriod,
+      trendRangeBandPct,
+      volAdaptiveStep,
+      atrPeriod,
+      atrMultiplier,
+      chaseAfterTp,
     }).realizedHistory;
     if (!compounding) {
       return { primary, comparison: null };
     }
-    // When compounding is on, plot a dashed baseline showing what the
-    // same setup would produce with compounding off — quick visual on
-    // how much the bumps actually contribute.
     const comparison = simulateAutoGrid(candles, {
       stepPrice,
       amountPerLevel,
       compounding: false,
+      trendFilter,
+      trendEmaPeriod,
+      trendRangeBandPct,
+      volAdaptiveStep,
+      atrPeriod,
+      atrMultiplier,
+      chaseAfterTp,
     }).realizedHistory;
     return { primary, comparison };
-  }, [candles, stepPrice, amountPerLevel, compounding]);
+  }, [
+    candles,
+    stepPrice,
+    amountPerLevel,
+    compounding,
+    trendFilter,
+    trendEmaPeriod,
+    trendRangeBandPct,
+    volAdaptiveStep,
+    atrPeriod,
+    atrMultiplier,
+    chaseAfterTp,
+  ]);
 
   const { chartPaneRef, hasCandles } = useStrategyChart(
     candles,

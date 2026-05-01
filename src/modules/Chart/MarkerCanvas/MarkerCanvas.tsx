@@ -200,10 +200,20 @@ export default function MarkerCanvas({
         if (candleIndex !== undefined && candleIndex > 0) {
           const prevCandle = candles[candleIndex - 1];
           const currCandle = candles[candleIndex];
+          // Buy interpolates on a down-cross (filling on a dip) AND on
+          // an up-cross — chase entries open simultaneously with their
+          // TP at the same price/time and need to land at the same x
+          // as the TP marker. Without the up-cross branch they snapped
+          // to raw candle time while the TP slid left to the actual
+          // line crossing, drifting them apart visually.
           const crossesDown =
-            spec.side === 'Buy' && prevCandle.close > spec.price && currCandle.close <= spec.price;
+            (spec.side === 'Buy' || spec.side === 'Sell') &&
+            prevCandle.close > spec.price &&
+            currCandle.close <= spec.price;
           const crossesUp =
-            spec.side === 'Sell' && prevCandle.close < spec.price && currCandle.close >= spec.price;
+            (spec.side === 'Buy' || spec.side === 'Sell') &&
+            prevCandle.close < spec.price &&
+            currCandle.close >= spec.price;
           if (crossesDown || crossesUp) {
             const prevX = chart.timeScale().timeToCoordinate(toUTCTimestamp(prevCandle.time));
             if (prevX !== null) {

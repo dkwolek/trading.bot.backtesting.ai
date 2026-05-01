@@ -12,10 +12,18 @@ import { useTradingContext } from '../../context/TradingContext';
 import {
   computeLevelOccupancy,
   resolveAmountPerLevel,
+  resolveAtrMultiplier,
+  resolveAtrPeriod,
+  resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
+  resolveTrendEmaPeriod,
+  resolveTrendFilter,
+  resolveTrendRangeBandPct,
+  resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
+import { useTrendOverlay } from './hooks/useTrendOverlay';
 import LevelOccupancyOverlay from './LevelOccupancyOverlay/LevelOccupancyOverlay';
 import t from '../../locales';
 
@@ -32,29 +40,43 @@ export default function Chart({ pair, candles, trades }: Props) {
 
   const { selectedAlgo, algoOptions } = useTradingContext();
   const isAutoGrid = selectedAlgo.id === AlgoId.AutoGrid;
-  const autoGridStep = isAutoGrid ? resolveStepPrice(algoOptions) : null;
 
-  const levelStats = useMemo(() => {
+  const { compoundEvents, trendEma, trendLowerBand, effectiveStepPrice } = useMemo(() => {
     if (!isAutoGrid || candles.length === 0) {
-      return [];
-    }
-    return computeLevelOccupancy(candles, resolveStepPrice(algoOptions));
-  }, [isAutoGrid, candles, algoOptions]);
-
-  const compoundEvents = useMemo(() => {
-    if (!isAutoGrid || candles.length === 0) {
-      return [];
+      return { compoundEvents: [], trendEma: [], trendLowerBand: [], effectiveStepPrice: null };
     }
     const sim = simulateAutoGrid(candles, {
       stepPrice: resolveStepPrice(algoOptions),
       amountPerLevel: resolveAmountPerLevel(algoOptions),
       compounding: resolveCompounding(algoOptions),
+      trendFilter: resolveTrendFilter(algoOptions),
+      trendEmaPeriod: resolveTrendEmaPeriod(algoOptions),
+      trendRangeBandPct: resolveTrendRangeBandPct(algoOptions),
+      volAdaptiveStep: resolveVolAdaptiveStep(algoOptions),
+      atrPeriod: resolveAtrPeriod(algoOptions),
+      atrMultiplier: resolveAtrMultiplier(algoOptions),
+      chaseAfterTp: resolveChaseAfterTp(algoOptions),
     });
-    return sim.compoundEvents;
+    return {
+      compoundEvents: sim.compoundEvents,
+      trendEma: sim.trendEma,
+      trendLowerBand: sim.trendLowerBand,
+      effectiveStepPrice: sim.effectiveStepPrice,
+    };
   }, [isAutoGrid, candles, algoOptions]);
+
+  const autoGridStep = effectiveStepPrice;
+
+  const levelStats = useMemo(() => {
+    if (!isAutoGrid || candles.length === 0 || effectiveStepPrice === null) {
+      return [];
+    }
+    return computeLevelOccupancy(candles, effectiveStepPrice);
+  }, [isAutoGrid, candles, effectiveStepPrice]);
 
   useChartData(chartRef, seriesRef, candleSeriesRef, candles);
   useMartingaleOverlay(chartRef, seriesRef, candles, autoGridStep, trades);
+  useTrendOverlay(chartRef, candles, trendEma, trendLowerBand);
   const crosshairLabelRef = useCrosshairLabel(chartRef, seriesRef);
 
   return (

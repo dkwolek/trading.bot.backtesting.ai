@@ -1,10 +1,16 @@
 import { useMemo } from 'react';
 import { useTradingContext } from '../../context/TradingContext';
 import {
-  computeRequiredCapital,
   resolveAmountPerLevel,
+  resolveAtrMultiplier,
+  resolveAtrPeriod,
+  resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
+  resolveTrendEmaPeriod,
+  resolveTrendFilter,
+  resolveTrendRangeBandPct,
+  resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
 
@@ -118,19 +124,45 @@ function pnlClass(value: number): string {
 }
 
 export default function AutoGridMetricsPanel() {
-  const { algoOptions, candles, initialAmount } = useTradingContext();
+  const { algoOptions, candles } = useTradingContext();
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
   const compounding = resolveCompounding(algoOptions);
-
-  const requiredCapital = useMemo(
-    () => computeRequiredCapital(candles, stepPrice, amountPerLevel),
-    [candles, stepPrice, amountPerLevel]
-  );
+  const trendFilter = resolveTrendFilter(algoOptions);
+  const trendEmaPeriod = resolveTrendEmaPeriod(algoOptions);
+  const trendRangeBandPct = resolveTrendRangeBandPct(algoOptions);
+  const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
+  const atrPeriod = resolveAtrPeriod(algoOptions);
+  const atrMultiplier = resolveAtrMultiplier(algoOptions);
+  const chaseAfterTp = resolveChaseAfterTp(algoOptions);
 
   const simulation = useMemo(
-    () => simulateAutoGrid(candles, { stepPrice, amountPerLevel, compounding }),
-    [candles, stepPrice, amountPerLevel, compounding]
+    () =>
+      simulateAutoGrid(candles, {
+        stepPrice,
+        amountPerLevel,
+        compounding,
+        trendFilter,
+        trendEmaPeriod,
+        trendRangeBandPct,
+        volAdaptiveStep,
+        atrPeriod,
+        atrMultiplier,
+        chaseAfterTp,
+      }),
+    [
+      candles,
+      stepPrice,
+      amountPerLevel,
+      compounding,
+      trendFilter,
+      trendEmaPeriod,
+      trendRangeBandPct,
+      volAdaptiveStep,
+      atrPeriod,
+      atrMultiplier,
+      chaseAfterTp,
+    ]
   );
 
   if (candles.length === 0) {
@@ -147,10 +179,10 @@ export default function AutoGridMetricsPanel() {
   }
 
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-4 gap-2">
       <DualMetricCard
         primaryLabel="Net"
-        primaryValue={formatPercent(simulation.netPnl, initialAmount)}
+        primaryValue={formatPercent(simulation.netPnl, simulation.requiredCapitalActual)}
         primaryClass={pnlClass(simulation.netPnl)}
         secondaryLabel="Net $"
         secondaryValue={`${simulation.netPnl >= 0 ? '+' : '-'}$${Math.abs(simulation.netPnl).toFixed(2)}`}
@@ -165,7 +197,7 @@ export default function AutoGridMetricsPanel() {
             <span
               className={`font-mono text-[13px] font-medium truncate ${pnlClass(simulation.totalProfit)}`}
             >
-              {formatPercent(simulation.totalProfit, initialAmount)}
+              {formatPercent(simulation.totalProfit, simulation.requiredCapitalActual)}
             </span>
             <span className={`font-mono text-[11px] truncate ${pnlClass(simulation.totalProfit)}`}>
               {formatDollarsSigned(simulation.totalProfit)}
@@ -180,7 +212,7 @@ export default function AutoGridMetricsPanel() {
             <span
               className={`font-mono text-[11px] font-medium truncate ${pnlClass(simulation.unrealizedPnl)}`}
             >
-              {formatPercent(simulation.unrealizedPnl, initialAmount)}
+              {formatPercent(simulation.unrealizedPnl, simulation.requiredCapitalActual)}
             </span>
             <span
               className={`font-mono text-[10px] truncate ${pnlClass(simulation.unrealizedPnl)}`}
@@ -192,25 +224,33 @@ export default function AutoGridMetricsPanel() {
       </div>
       <DualMetricCard
         primaryLabel="Required capital"
-        primaryValue={formatDollars(requiredCapital.capital)}
-        secondaryLabel="Open"
-        secondaryValue={formatDollars(simulation.openPositionsCost)}
+        primaryValue={formatDollars(simulation.requiredCapitalActual)}
+        secondaryLabel={
+          volAdaptiveStep
+            ? `step $${simulation.effectiveStepPrice.toFixed(2)} · ${simulation.uniqueLevelsTraded} levels`
+            : `${simulation.uniqueLevelsTraded} levels traded`
+        }
+        secondaryValue={`Open ${formatDollars(simulation.openPositionsCost)}`}
         secondaryClass={simulation.openPositionsCost > 0 ? 'text-yellow-400' : 'text-text'}
-      />
-      <DualMetricCard
-        primaryLabel="ROI / deployed"
-        primaryValue={formatPercent(simulation.totalProfit, simulation.maxCapitalDeployed)}
-        primaryClass={pnlClass(simulation.totalProfit)}
-        secondaryLabel={`vs ${formatDollars(simulation.maxCapitalDeployed)} peak`}
-        secondaryValue={formatDollarsSigned(simulation.totalProfit)}
-        secondaryClass={pnlClass(simulation.totalProfit)}
       />
       <DualMetricCard
         primaryLabel="Cycles"
         primaryValue={String(simulation.completedCycles)}
-        secondaryLabel="Open at end"
-        secondaryValue={String(simulation.openPositionsAtEnd)}
-        secondaryClass={simulation.openPositionsAtEnd > 0 ? 'text-yellow-400' : 'text-text'}
+        secondaryLabel={trendFilter ? 'Blocked' : 'Open at end'}
+        secondaryValue={
+          trendFilter
+            ? `${simulation.trendBlockedFills} / ${simulation.openPositionsAtEnd} open`
+            : String(simulation.openPositionsAtEnd)
+        }
+        secondaryClass={
+          trendFilter
+            ? simulation.trendBlockedFills > 0
+              ? 'text-purple-400'
+              : 'text-text'
+            : simulation.openPositionsAtEnd > 0
+              ? 'text-yellow-400'
+              : 'text-text'
+        }
       />
     </div>
   );

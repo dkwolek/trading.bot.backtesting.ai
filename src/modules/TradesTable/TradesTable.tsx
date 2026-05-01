@@ -4,11 +4,7 @@ import { useTradeHighlight } from '../../context/TradeHighlightContext';
 import { Trade } from '../../types/algo.types';
 import t from '../../locales';
 import { AlgoId } from '../../constants/algo.constants';
-import {
-  computeRequiredCapital,
-  resolveAmountPerLevel,
-  resolveStepPrice,
-} from '../../algos/auto-grid.algo';
+import { resolveAmountPerLevel } from '../../algos/auto-grid.algo';
 import TradeDetailModal, { TradeDetail } from '../TradeDetailModal/TradeDetailModal';
 import TradeCard from './TradeCard/TradeCard';
 import LevelGroupRow from './LevelGroupRow/LevelGroupRow';
@@ -23,7 +19,7 @@ export interface TradesTableHandle {
 }
 
 const TradesTable = forwardRef<TradesTableHandle, Props>(function TradesTable({ trades }, ref) {
-  const { initialAmount, algoOptions, selectedAlgo, candles } = useTradingContext();
+  const { initialAmount, algoOptions, selectedAlgo } = useTradingContext();
   const { hoveredEntryTime } = useTradeHighlight();
   const isAutoGrid = selectedAlgo.id === AlgoId.AutoGrid;
   // Each trade is one fixed-size buy worth `autoGridAmountPerLevel`.
@@ -36,17 +32,18 @@ const TradesTable = forwardRef<TradesTableHandle, Props>(function TradesTable({ 
     }
     return 3;
   })();
-  // For grid bots, the per-trade % is more meaningfully expressed against
-  // the capital required to cover the period's price range than against
-  // the running account balance — this is what the user actually has at
-  // stake.
-  const requiredCapital = isAutoGrid
-    ? computeRequiredCapital(
-        candles,
-        resolveStepPrice(algoOptions),
-        resolveAmountPerLevel(algoOptions)
-      ).capital
-    : 0;
+  // Required capital = distinct entry levels actually visited × amount.
+  // Trend filter and other gating naturally shrink this — we count
+  // unique entry prices straight from the trade list rather than
+  // re-simulating, since trades already reflect the bot's behavior.
+  const requiredCapital = (() => {
+    if (!isAutoGrid || !trades || trades.length === 0) {
+      return 0;
+    }
+    const amount = resolveAmountPerLevel(algoOptions);
+    const uniqueLevels = new Set(trades.map((trade) => trade.entryPrice));
+    return uniqueLevels.size * amount;
+  })();
   const rows = trades ? buildRows(trades, initialAmount, totalSlots).reverse() : [];
   const openRows = rows.filter((row) => row.trade.exitLabel === 'OPEN');
   const closedRows = rows.filter((row) => row.trade.exitLabel !== 'OPEN');
