@@ -7,9 +7,6 @@ import {
   resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
-  resolveTrendEmaPeriod,
-  resolveTrendFilter,
-  resolveTrendRangeBandPct,
   resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
@@ -128,9 +125,6 @@ export default function AutoGridMetricsPanel() {
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
   const compounding = resolveCompounding(algoOptions);
-  const trendFilter = resolveTrendFilter(algoOptions);
-  const trendEmaPeriod = resolveTrendEmaPeriod(algoOptions);
-  const trendRangeBandPct = resolveTrendRangeBandPct(algoOptions);
   const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
   const atrPeriod = resolveAtrPeriod(algoOptions);
   const atrMultiplier = resolveAtrMultiplier(algoOptions);
@@ -142,9 +136,6 @@ export default function AutoGridMetricsPanel() {
         stepPrice,
         amountPerLevel,
         compounding,
-        trendFilter,
-        trendEmaPeriod,
-        trendRangeBandPct,
         volAdaptiveStep,
         atrPeriod,
         atrMultiplier,
@@ -155,9 +146,6 @@ export default function AutoGridMetricsPanel() {
       stepPrice,
       amountPerLevel,
       compounding,
-      trendFilter,
-      trendEmaPeriod,
-      trendRangeBandPct,
       volAdaptiveStep,
       atrPeriod,
       atrMultiplier,
@@ -236,21 +224,9 @@ export default function AutoGridMetricsPanel() {
       <DualMetricCard
         primaryLabel="Cycles"
         primaryValue={String(simulation.completedCycles)}
-        secondaryLabel={trendFilter ? 'Blocked' : 'Open at end'}
-        secondaryValue={
-          trendFilter
-            ? `${simulation.trendBlockedFills} / ${simulation.openPositionsAtEnd} open`
-            : String(simulation.openPositionsAtEnd)
-        }
-        secondaryClass={
-          trendFilter
-            ? simulation.trendBlockedFills > 0
-              ? 'text-purple-400'
-              : 'text-text'
-            : simulation.openPositionsAtEnd > 0
-              ? 'text-yellow-400'
-              : 'text-text'
-        }
+        secondaryLabel="Open at end"
+        secondaryValue={String(simulation.openPositionsAtEnd)}
+        secondaryClass={simulation.openPositionsAtEnd > 0 ? 'text-yellow-400' : 'text-text'}
       />
     </div>
   );

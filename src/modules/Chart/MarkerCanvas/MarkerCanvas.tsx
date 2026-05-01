@@ -37,7 +37,10 @@ function buildMarkerSpecs(trades: Trade[]): MarkerSpec[] {
   // Emit every cycle's marker — the spatial decimation in the draw
   // loop collapses overlapping ones based on the current zoom, so the
   // user sees more markers when they zoom in but not a wall of
-  // identical labels when zoomed out.
+  // identical labels when zoomed out. Sort by time at the end so the
+  // draw loop can binary-search the visible window instead of scanning
+  // all specs every frame (matters on dense 1m × 12M datasets where
+  // specs.length pushes 100k+).
   const specs: MarkerSpec[] = [];
   for (const trade of trades) {
     for (const level of trade.levels) {
@@ -58,7 +61,25 @@ function buildMarkerSpecs(trades: Trade[]): MarkerSpec[] {
       label: `TP${Math.round(trade.entryPrice)}`,
     });
   }
+  specs.sort((first, second) => first.time - second.time);
   return specs;
+}
+
+// Returns the smallest index i such that specs[i].time >= time. Spec
+// array is sorted by time so we can clip the per-frame iteration to
+// just the visible window instead of scanning every entry.
+function lowerBoundByTime(specs: MarkerSpec[], time: number): number {
+  let low = 0;
+  let high = specs.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (specs[mid].time < time) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
 }
 
 function drawArrow(
@@ -177,12 +198,18 @@ export default function MarkerCanvas({
       const placed: { side: 'Buy' | 'Sell'; xBucket: number; yBucket: number }[] = [];
       let drawn = 0;
 
-      for (const spec of specs) {
+      // Clip iteration to the visible window via binary search — on
+      // 1m × 12M datasets specs.length easily exceeds 100k and a
+      // linear scan per frame eats noticeable CPU even though the
+      // visibility check rejects every off-screen entry.
+      const startIndex = Number.isFinite(fromTime) ? lowerBoundByTime(specs, fromTime) : 0;
+      for (let specIndex = startIndex; specIndex < specs.length; specIndex++) {
+        const spec = specs[specIndex];
         if (drawn >= MAX_MARKERS) {
           break;
         }
-        if (spec.time < fromTime || spec.time > toTime) {
-          continue;
+        if (spec.time > toTime) {
+          break;
         }
         const baseX = chart.timeScale().timeToCoordinate(toUTCTimestamp(spec.time));
         const y = series.priceToCoordinate(spec.price);

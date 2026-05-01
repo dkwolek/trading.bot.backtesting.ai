@@ -9,9 +9,6 @@ import {
   resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
-  resolveTrendEmaPeriod,
-  resolveTrendFilter,
-  resolveTrendRangeBandPct,
   resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
@@ -27,9 +24,6 @@ export default function StrategyChart({ candles }: Props) {
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
   const compounding = resolveCompounding(algoOptions);
-  const trendFilter = resolveTrendFilter(algoOptions);
-  const trendEmaPeriod = resolveTrendEmaPeriod(algoOptions);
-  const trendRangeBandPct = resolveTrendRangeBandPct(algoOptions);
   const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
   const atrPeriod = resolveAtrPeriod(algoOptions);
   const atrMultiplier = resolveAtrMultiplier(algoOptions);
@@ -43,9 +37,6 @@ export default function StrategyChart({ candles }: Props) {
       stepPrice,
       amountPerLevel,
       compounding,
-      trendFilter,
-      trendEmaPeriod,
-      trendRangeBandPct,
       volAdaptiveStep,
       atrPeriod,
       atrMultiplier,
@@ -58,9 +49,6 @@ export default function StrategyChart({ candles }: Props) {
       stepPrice,
       amountPerLevel,
       compounding: false,
-      trendFilter,
-      trendEmaPeriod,
-      trendRangeBandPct,
       volAdaptiveStep,
       atrPeriod,
       atrMultiplier,
@@ -72,9 +60,6 @@ export default function StrategyChart({ candles }: Props) {
     stepPrice,
     amountPerLevel,
     compounding,
-    trendFilter,
-    trendEmaPeriod,
-    trendRangeBandPct,
     volAdaptiveStep,
     atrPeriod,
     atrMultiplier,

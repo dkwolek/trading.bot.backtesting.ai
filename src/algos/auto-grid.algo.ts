@@ -3,14 +3,11 @@ import { TRADE_FEE } from '../constants/fees.constants';
 import t from '../locales';
 import { AlgoOptions, ControlDef, Signal } from '../types/algo.types';
 import { Candle } from '../types/global.types';
-import { computeEMA, meanATR } from '../utils/indicators';
+import { meanATR } from '../utils/indicators';
 
 const DEFAULT_STEP_PRICE = 25;
 const DEFAULT_AMOUNT_PER_LEVEL = 10;
 const DEFAULT_COMPOUNDING = false;
-const DEFAULT_TREND_FILTER = false;
-const DEFAULT_TREND_EMA_PERIOD = 200;
-const DEFAULT_TREND_RANGE_BAND_PCT = 1.5;
 const DEFAULT_VOL_ADAPTIVE_STEP = false;
 const DEFAULT_ATR_PERIOD = 14;
 const DEFAULT_ATR_MULTIPLIER = 0.5;
@@ -26,9 +23,6 @@ const COMPOUND_RATIO = 0.1;
 export const AUTO_GRID_STEP_PRICE_KEY = 'autoGridStepPrice';
 export const AUTO_GRID_AMOUNT_PER_LEVEL_KEY = 'autoGridAmountPerLevel';
 export const AUTO_GRID_COMPOUNDING_KEY = 'autoGridCompounding';
-export const AUTO_GRID_TREND_FILTER_KEY = 'autoGridTrendFilter';
-export const AUTO_GRID_TREND_EMA_PERIOD_KEY = 'autoGridTrendEmaPeriod';
-export const AUTO_GRID_TREND_RANGE_BAND_KEY = 'autoGridTrendRangeBand';
 export const AUTO_GRID_VOL_ADAPTIVE_STEP_KEY = 'autoGridVolAdaptiveStep';
 export const AUTO_GRID_ATR_PERIOD_KEY = 'autoGridAtrPeriod';
 export const AUTO_GRID_ATR_MULTIPLIER_KEY = 'autoGridAtrMultiplier';
@@ -44,6 +38,7 @@ export const controls: ControlDef[] = [
     max: 1000,
     step: 5,
     group: 'Levels',
+    disabledWhen: { key: AUTO_GRID_VOL_ADAPTIVE_STEP_KEY, value: true },
   },
   {
     key: AUTO_GRID_AMOUNT_PER_LEVEL_KEY,
@@ -63,33 +58,6 @@ export const controls: ControlDef[] = [
     group: 'Levels',
   },
   {
-    key: AUTO_GRID_TREND_FILTER_KEY,
-    title: t.autoGridControls.trendFilter,
-    type: 'checkbox',
-    defaultValue: DEFAULT_TREND_FILTER,
-    group: 'Trend filter',
-  },
-  {
-    key: AUTO_GRID_TREND_EMA_PERIOD_KEY,
-    title: t.autoGridControls.trendEmaPeriod,
-    type: 'slider',
-    defaultValue: DEFAULT_TREND_EMA_PERIOD,
-    min: 50,
-    max: 500,
-    step: 10,
-    group: 'Trend filter',
-  },
-  {
-    key: AUTO_GRID_TREND_RANGE_BAND_KEY,
-    title: t.autoGridControls.trendRangeBand,
-    type: 'slider',
-    defaultValue: DEFAULT_TREND_RANGE_BAND_PCT,
-    min: 0,
-    max: 10,
-    step: 0.1,
-    group: 'Trend filter',
-  },
-  {
     key: AUTO_GRID_VOL_ADAPTIVE_STEP_KEY,
     title: t.autoGridControls.volAdaptiveStep,
     type: 'checkbox',
@@ -102,7 +70,7 @@ export const controls: ControlDef[] = [
     type: 'slider',
     defaultValue: DEFAULT_ATR_PERIOD,
     min: 5,
-    max: 50,
+    max: 200,
     step: 1,
     group: 'Vol-adaptive step',
   },
@@ -112,7 +80,7 @@ export const controls: ControlDef[] = [
     type: 'slider',
     defaultValue: DEFAULT_ATR_MULTIPLIER,
     min: 0.1,
-    max: 2,
+    max: 5,
     step: 0.1,
     group: 'Vol-adaptive step',
   },
@@ -142,27 +110,6 @@ export function resolveAmountPerLevel(options: AlgoOptions): number {
 export function resolveCompounding(options: AlgoOptions): boolean {
   const value = options[AUTO_GRID_COMPOUNDING_KEY];
   return typeof value === 'boolean' ? value : DEFAULT_COMPOUNDING;
-}
-
-export function resolveTrendFilter(options: AlgoOptions): boolean {
-  const value = options[AUTO_GRID_TREND_FILTER_KEY];
-  return typeof value === 'boolean' ? value : DEFAULT_TREND_FILTER;
-}
-
-export function resolveTrendEmaPeriod(options: AlgoOptions): number {
-  const value = options[AUTO_GRID_TREND_EMA_PERIOD_KEY];
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    return DEFAULT_TREND_EMA_PERIOD;
-  }
-  return Math.max(2, Math.floor(value));
-}
-
-export function resolveTrendRangeBandPct(options: AlgoOptions): number {
-  const value = options[AUTO_GRID_TREND_RANGE_BAND_KEY];
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    return DEFAULT_TREND_RANGE_BAND_PCT;
-  }
-  return value;
 }
 
 export function resolveVolAdaptiveStep(options: AlgoOptions): boolean {
@@ -227,12 +174,6 @@ export interface AutoGridSimulation {
   // compounded amountPerLevel bumps that buildTrades/computeMetrics
   // can't see, since they only carry pnlPercent).
   realizedHistory: RealizedSnapshot[];
-  // EMA series and the lower-band cutoff (`ema * (1 - bandPct/100)`) for
-  // every candle — null where EMA isn't seeded yet. Drives the chart
-  // overlay and matches the values the simulator used for blocking.
-  trendEma: (number | null)[];
-  trendLowerBand: (number | null)[];
-  trendBlockedFills: number; // fills skipped because of trend filter
   uniqueLevelsTraded: number; // distinct level indices that had ≥ 1 buy
   requiredCapitalActual: number; // uniqueLevelsTraded × initial amountPerLevel
   effectiveStepPrice: number; // step actually used (= ATR-derived if vol-adaptive)
@@ -315,14 +256,6 @@ export interface BotSimConfig {
   // the threshold is crossed; emitted as a 'COMPOUND' marker so the
   // chart can show when each level-size jump happened.
   compounding?: boolean;
-  // Asymmetric trend filter: when enabled, new buys are blocked while
-  // close < ema * (1 - rangeBandPct/100) — i.e. price is in the
-  // downtrend zone below the EMA's lower band. Above the band the
-  // sim wouldn't fill anyway (price isn't down-crossing levels), so
-  // there's no symmetric block. TPs and top-cuts keep firing.
-  trendFilter?: boolean;
-  trendEmaPeriod?: number;
-  trendRangeBandPct?: number;
   // When true, `stepPrice` is ignored — sim computes mean ATR(period)
   // over the dataset and uses `meanATR × atrMultiplier` as the
   // effective step. Auto-tunes step magnitude to the asset's
@@ -354,9 +287,6 @@ export interface CompoundEvent {
  */
 export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoGridSimulation {
   const compounding = config.compounding ?? false;
-  const trendFilter = config.trendFilter ?? false;
-  const trendEmaPeriod = Math.max(2, Math.floor(config.trendEmaPeriod ?? DEFAULT_TREND_EMA_PERIOD));
-  const trendRangeBandPct = Math.max(0, config.trendRangeBandPct ?? DEFAULT_TREND_RANGE_BAND_PCT);
   const volAdaptive = config.volAdaptiveStep ?? false;
   const atrPeriod = Math.max(2, Math.floor(config.atrPeriod ?? DEFAULT_ATR_PERIOD));
   const atrMultiplier = Math.max(0.01, config.atrMultiplier ?? DEFAULT_ATR_MULTIPLIER);
@@ -389,9 +319,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       signals: [],
       compoundEvents: [],
       realizedHistory: [],
-      trendEma: [],
-      trendLowerBand: [],
-      trendBlockedFills: 0,
       uniqueLevelsTraded: 0,
       requiredCapitalActual: 0,
       effectiveStepPrice: stepPrice,
@@ -426,22 +353,9 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   const signals: Signal[] = [];
   const compoundEvents: CompoundEvent[] = [];
   const realizedHistory: RealizedSnapshot[] = [];
-  let trendBlockedFills = 0;
   // Track distinct level indices the bot ever bought — drives the
-  // filter-aware Required capital metric. Without filter this matches
-  // computeRequiredCapital(); with filter it shrinks because the
-  // downtrend zone never gets visited.
+  // Required capital metric (uniqueLevelsTraded × amountPerLevel).
   const tradedLevels = new Set<number>();
-
-  // Pre-compute the EMA series + matching lower-band cutoff so the
-  // chart overlay and the per-candle gate use exactly the same numbers.
-  // Below the band counts as "downtrend" — fills get skipped this
-  // candle. Above the band the sim wouldn't naturally fill anyway, so
-  // the asymmetric block is a no-op there.
-  const trendEma = trendFilter ? computeEMA(candles, trendEmaPeriod) : candles.map(() => null);
-  const trendLowerBand: (number | null)[] = trendEma.map((value) =>
-    value === null ? null : value * (1 - trendRangeBandPct / 100)
-  );
 
   // We use the previous candle's close as the upper boundary for new
   // fills: a buy at level L fires only if price was above L at the end
@@ -452,8 +366,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   // actually crosses $2320 going down).
   let prevCloseIndex = Math.floor(candles[0].open / stepPrice);
 
-  for (let candleIndex = 0; candleIndex < candles.length; candleIndex++) {
-    const candle = candles[candleIndex];
+  for (const candle of candles) {
     // ceil for the low so we only count grid levels at or above `low` —
     // floor would buy the level just below low (e.g. low=$2308, step=$10
     // → floor=230=$2300), firing a phantom cycle whose TP shows up on the
@@ -473,10 +386,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     //    loop so each pass re-considers slots created by the previous
     //    pass — without it a wide-range candle on a strong uptrend
     //    would only fire one cycle when it should fire many.
-    const lowerBandForChase = trendLowerBand[candleIndex];
-    const chaseBlockedByTrend =
-      trendFilter && lowerBandForChase !== null && candle.close < lowerBandForChase;
-
     let tpProgress = true;
     while (tpProgress) {
       tpProgress = false;
@@ -521,11 +430,11 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
           }
 
           // Chase: open a fresh buy at the level we just sold at
-          // (tpIndex) so the grid follows rising price. Skips when the
-          // trend filter is blocking buys this candle, and when that
-          // level is already owned (rare but possible if the candle
-          // also down-crossed the same level earlier in fill phase).
-          if (chaseAfterTp && !chaseBlockedByTrend && !owned.has(tpIndex)) {
+          // (tpIndex) so the grid follows rising price. Skips when
+          // that level is already owned (rare but possible if the
+          // candle also down-crossed the same level earlier in fill
+          // phase).
+          if (chaseAfterTp && !owned.has(tpIndex)) {
             const chaseLevelPrice = tpIndex * stepPrice;
             const volume = (amountPerLevel * (1 - TRADE_FEE)) / chaseLevelPrice;
             owned.set(tpIndex, {
@@ -544,24 +453,8 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     // 2. Fills against candle.low — every level the price crossed going
     //    DOWN from the prior candle's close (between prevCloseIndex and
     //    lowIndex, inclusive) gets bought if no slot is currently owned.
-    //    Gated by the trend filter: if close sits in the downtrend zone
-    //    (below ema × (1 − band/100)) we skip every level this candle
-    //    and bump the blocked-fills counter once per slot we would have
-    //    opened. Filter is a no-op until the EMA is seeded.
-    const lowerBand = trendLowerBand[candleIndex];
-    const isBlockedByTrend = trendFilter && lowerBand !== null && candle.close < lowerBand;
     const fillCeiling = prevCloseIndex;
-    if (isBlockedByTrend) {
-      for (let levelIndex = fillCeiling; levelIndex >= lowIndex; levelIndex--) {
-        if (levelIndex <= 0) {
-          break;
-        }
-        if (owned.has(levelIndex)) {
-          continue;
-        }
-        trendBlockedFills += 1;
-      }
-    } else {
+    {
       for (let levelIndex = fillCeiling; levelIndex >= lowIndex; levelIndex--) {
         if (levelIndex <= 0) {
           break;
@@ -635,9 +528,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     signals,
     compoundEvents,
     realizedHistory,
-    trendEma,
-    trendLowerBand,
-    trendBlockedFills,
     uniqueLevelsTraded: tradedLevels.size,
     requiredCapitalActual: tradedLevels.size * config.amountPerLevel,
     effectiveStepPrice: stepPrice,
@@ -651,9 +541,6 @@ export function run(candles: Candle[], options: AlgoOptions): Signal[] {
     stepPrice: resolveStepPrice(options),
     amountPerLevel: resolveAmountPerLevel(options),
     compounding: resolveCompounding(options),
-    trendFilter: resolveTrendFilter(options),
-    trendEmaPeriod: resolveTrendEmaPeriod(options),
-    trendRangeBandPct: resolveTrendRangeBandPct(options),
     volAdaptiveStep: resolveVolAdaptiveStep(options),
     atrPeriod: resolveAtrPeriod(options),
     atrMultiplier: resolveAtrMultiplier(options),

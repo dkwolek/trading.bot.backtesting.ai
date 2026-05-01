@@ -82,39 +82,6 @@ describe('simulateAutoGrid', () => {
     expect(chased.lockedLevels[0].level).toBe(200);
   });
 
-  it('chase respects trend filter — no chase below the lower band', () => {
-    // Long flat preamble seeds EMA above the close, pushing it into
-    // "downtrend zone" so the trend filter blocks new buys. After a
-    // seed entry that pre-dates the filter, an uptrend candle would
-    // normally cascade chase entries — but with filter active and
-    // close still below band, chase is suppressed.
-    const candles: Candle[] = [];
-    for (let index = 0; index < 200; index++) {
-      candles.push(makeCandle(1700000000 + index * 60, 110, 110, 110, 110));
-    }
-    candles.push(makeCandle(1700000000 + 200 * 60, 90, 90, 90, 90));
-    candles.push(makeCandle(1700000000 + 201 * 60, 91, 100, 91, 92));
-
-    const blocked = simulateAutoGrid(candles, {
-      stepPrice: 10,
-      amountPerLevel: 10,
-      chaseAfterTp: true,
-      trendFilter: true,
-      trendEmaPeriod: 50,
-      trendRangeBandPct: 1,
-    });
-    const unblocked = simulateAutoGrid(candles, {
-      stepPrice: 10,
-      amountPerLevel: 10,
-      chaseAfterTp: true,
-      trendFilter: false,
-    });
-
-    // Filter on → chase suppressed → fewer cycles than the
-    // unblocked baseline on the same data.
-    expect(blocked.completedCycles).toBeLessThanOrEqual(unblocked.completedCycles);
-  });
-
   it('cycles every level when price oscillates', () => {
     // Saw-tooth that crosses several grid levels both ways → cycles fire.
     const candles: Candle[] = [];
