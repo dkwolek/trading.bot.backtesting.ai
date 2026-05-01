@@ -6,7 +6,6 @@ import {
   resolveAmountPerLevel,
   resolveAtrMultiplier,
   resolveAtrPeriod,
-  resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
   resolveVolAdaptiveStep,
@@ -27,7 +26,6 @@ export default function StrategyChart({ candles }: Props) {
   const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
   const atrPeriod = resolveAtrPeriod(algoOptions);
   const atrMultiplier = resolveAtrMultiplier(algoOptions);
-  const chaseAfterTp = resolveChaseAfterTp(algoOptions);
 
   const histories = useMemo(() => {
     if (!candles || candles.length === 0) {
@@ -40,7 +38,6 @@ export default function StrategyChart({ candles }: Props) {
       volAdaptiveStep,
       atrPeriod,
       atrMultiplier,
-      chaseAfterTp,
     }).realizedHistory;
     if (!compounding) {
       return { primary, comparison: null };
@@ -52,19 +49,9 @@ export default function StrategyChart({ candles }: Props) {
       volAdaptiveStep,
       atrPeriod,
       atrMultiplier,
-      chaseAfterTp,
     }).realizedHistory;
     return { primary, comparison };
-  }, [
-    candles,
-    stepPrice,
-    amountPerLevel,
-    compounding,
-    volAdaptiveStep,
-    atrPeriod,
-    atrMultiplier,
-    chaseAfterTp,
-  ]);
+  }, [candles, stepPrice, amountPerLevel, compounding, volAdaptiveStep, atrPeriod, atrMultiplier]);
 
   const { chartPaneRef, hasCandles } = useStrategyChart(
     candles,

@@ -56,30 +56,23 @@ describe('simulateAutoGrid', () => {
 
   it('chase-after-tp cascades multiple cycles in a single uptrend candle', () => {
     // Seed candle at $90 fills L9. The climb candle opens at $100 (no
-    // dip back to $90) and reaches $200 — chase must cascade
-    // L9→L10→...→L19 in one TP-loop pass, ending owned at L20 with
-    // 11 closed cycles. Without chase, only the L9→$100 cycle fires
-    // and the rest of the climb is "wasted" (grid sits empty).
+    // dip back to $90) and reaches $200 — chase cascades L9→L10→...→L19
+    // in one TP-loop pass, ending owned at L20 with 11 closed cycles.
+    // Chase is now always on so the assertion just pins the cascade
+    // count + final bag.
     const seed = makeCandle(1700000000, 90, 90, 90, 90);
     const climb = makeCandle(1700000060, 100, 200, 100, 200);
     const candles = [seed, climb];
 
-    const baseline = simulateAutoGrid(candles, {
+    const result = simulateAutoGrid(candles, {
       stepPrice: 10,
       amountPerLevel: 10,
-      chaseAfterTp: false,
-    });
-    const chased = simulateAutoGrid(candles, {
-      stepPrice: 10,
-      amountPerLevel: 10,
-      chaseAfterTp: true,
     });
 
-    expect(baseline.completedCycles).toBe(1);
-    expect(chased.completedCycles).toBe(11);
-    expect(chased.totalProfit).toBeGreaterThan(baseline.totalProfit);
-    expect(chased.openPositionsAtEnd).toBe(1);
-    expect(chased.lockedLevels[0].level).toBe(200);
+    expect(result.completedCycles).toBe(11);
+    expect(result.totalProfit).toBeGreaterThan(0);
+    expect(result.openPositionsAtEnd).toBe(1);
+    expect(result.lockedLevels[0].level).toBe(200);
   });
 
   it('cycles every level when price oscillates', () => {

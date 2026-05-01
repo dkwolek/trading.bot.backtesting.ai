@@ -14,7 +14,6 @@ import {
   resolveAmountPerLevel,
   resolveAtrMultiplier,
   resolveAtrPeriod,
-  resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
   resolveVolAdaptiveStep,
@@ -48,7 +47,6 @@ export default function Chart({ pair, candles, trades }: Props) {
       volAdaptiveStep: resolveVolAdaptiveStep(algoOptions),
       atrPeriod: resolveAtrPeriod(algoOptions),
       atrMultiplier: resolveAtrMultiplier(algoOptions),
-      chaseAfterTp: resolveChaseAfterTp(algoOptions),
     });
     return {
       compoundEvents: sim.compoundEvents,

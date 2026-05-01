@@ -18,6 +18,7 @@ interface ConnectionInput {
 export interface BotStatusHook extends BotStatusState {
   connect: (input: ConnectionInput) => Promise<void>;
   disconnect: () => void;
+  refresh: () => void;
 }
 
 export function useBotStatus(): BotStatusHook {
@@ -84,6 +85,14 @@ export function useBotStatus(): BotStatusHook {
     setState({ data: null, isLoading: false, errorMessage: null, isConnected: false });
   }
 
+  function refreshNow() {
+    if (!credentialsRef.current) {
+      return;
+    }
+    clearTimer();
+    refresh(false);
+  }
+
   useEffect(() => {
     return () => {
       credentialsRef.current = null;
@@ -91,5 +100,5 @@ export function useBotStatus(): BotStatusHook {
     };
   }, []);
 
-  return { ...state, connect, disconnect };
+  return { ...state, connect, disconnect, refresh: refreshNow };
 }

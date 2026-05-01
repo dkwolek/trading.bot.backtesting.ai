@@ -11,7 +11,6 @@ const DEFAULT_COMPOUNDING = false;
 const DEFAULT_VOL_ADAPTIVE_STEP = false;
 const DEFAULT_ATR_PERIOD = 14;
 const DEFAULT_ATR_MULTIPLIER = 0.5;
-const DEFAULT_CHASE_AFTER_TP = false;
 
 // Each compound bump scales `amountPerLevel` by this fraction (10%) and
 // requires `levelCount * amountPerLevel * COMPOUND_RATIO` fresh realised
@@ -26,7 +25,6 @@ export const AUTO_GRID_COMPOUNDING_KEY = 'autoGridCompounding';
 export const AUTO_GRID_VOL_ADAPTIVE_STEP_KEY = 'autoGridVolAdaptiveStep';
 export const AUTO_GRID_ATR_PERIOD_KEY = 'autoGridAtrPeriod';
 export const AUTO_GRID_ATR_MULTIPLIER_KEY = 'autoGridAtrMultiplier';
-export const AUTO_GRID_CHASE_AFTER_TP_KEY = 'autoGridChaseAfterTp';
 
 export const controls: ControlDef[] = [
   {
@@ -84,13 +82,6 @@ export const controls: ControlDef[] = [
     step: 0.1,
     group: 'Vol-adaptive step',
   },
-  {
-    key: AUTO_GRID_CHASE_AFTER_TP_KEY,
-    title: t.autoGridControls.chaseAfterTp,
-    type: 'checkbox',
-    defaultValue: DEFAULT_CHASE_AFTER_TP,
-    group: 'Levels',
-  },
 ];
 
 export function resolveStepPrice(options: AlgoOptions): number {
@@ -131,11 +122,6 @@ export function resolveAtrMultiplier(options: AlgoOptions): number {
     return DEFAULT_ATR_MULTIPLIER;
   }
   return value;
-}
-
-export function resolveChaseAfterTp(options: AlgoOptions): boolean {
-  const value = options[AUTO_GRID_CHASE_AFTER_TP_KEY];
-  return typeof value === 'boolean' ? value : DEFAULT_CHASE_AFTER_TP;
 }
 
 export interface MaxDropInfo {
@@ -264,12 +250,6 @@ export interface BotSimConfig {
   volAdaptiveStep?: boolean;
   atrPeriod?: number;
   atrMultiplier?: number;
-  // After every TP that closes a cycle, place a fresh buy at the level
-  // we just sold at (one step above the entry that just closed). Lets
-  // the grid "chase" rising price — in a sustained uptrend the bot
-  // keeps cycling instead of sitting empty waiting for a pullback.
-  // Subject to the trend filter the same way regular fills are.
-  chaseAfterTp?: boolean;
 }
 
 export interface CompoundEvent {
@@ -290,7 +270,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   const volAdaptive = config.volAdaptiveStep ?? false;
   const atrPeriod = Math.max(2, Math.floor(config.atrPeriod ?? DEFAULT_ATR_PERIOD));
   const atrMultiplier = Math.max(0.01, config.atrMultiplier ?? DEFAULT_ATR_MULTIPLIER);
-  const chaseAfterTp = config.chaseAfterTp ?? false;
 
   // Resolve effective step BEFORE the empty-data guard — vol-adaptive
   // mode replaces config.stepPrice entirely. Falls back to manual
@@ -378,14 +357,15 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     //    fits below the high closes for profit. Sell side is fee-free;
     //    only the buy paid a maker fee, already baked into volume.
     //
-    //    With `chaseAfterTp` ON, every TP also opens a fresh buy at the
-    //    level we just sold at (one step above the closed entry). That
-    //    new slot can itself TP within the same candle if the high
-    //    reaches its target, cascading through multiple levels in one
-    //    go. We therefore wrap the TP scan in a `while (madeProgress)`
-    //    loop so each pass re-considers slots created by the previous
-    //    pass — without it a wide-range candle on a strong uptrend
-    //    would only fire one cycle when it should fire many.
+    //    Every TP also opens a fresh buy at the level we just sold at
+    //    (one step above the closed entry) — chase-after-TP is now
+    //    always on. That new slot can itself TP within the same candle
+    //    if the high reaches its target, cascading through multiple
+    //    levels in one go. We therefore wrap the TP scan in a
+    //    `while (madeProgress)` loop so each pass re-considers slots
+    //    created by the previous pass — without it a wide-range candle
+    //    on a strong uptrend would only fire one cycle when it should
+    //    fire many.
     let tpProgress = true;
     while (tpProgress) {
       tpProgress = false;
@@ -430,11 +410,12 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
           }
 
           // Chase: open a fresh buy at the level we just sold at
-          // (tpIndex) so the grid follows rising price. Skips when
-          // that level is already owned (rare but possible if the
-          // candle also down-crossed the same level earlier in fill
-          // phase).
-          if (chaseAfterTp && !owned.has(tpIndex)) {
+          // (tpIndex) so the grid follows rising price. Always-on
+          // — without chase, pure uptrends leave the grid empty
+          // until the next pullback. Skips when that level is
+          // already owned (rare, possible if the candle also
+          // down-crossed the same level in the fill phase below).
+          if (!owned.has(tpIndex)) {
             const chaseLevelPrice = tpIndex * stepPrice;
             const volume = (amountPerLevel * (1 - TRADE_FEE)) / chaseLevelPrice;
             owned.set(tpIndex, {
@@ -544,7 +525,6 @@ export function run(candles: Candle[], options: AlgoOptions): Signal[] {
     volAdaptiveStep: resolveVolAdaptiveStep(options),
     atrPeriod: resolveAtrPeriod(options),
     atrMultiplier: resolveAtrMultiplier(options),
-    chaseAfterTp: resolveChaseAfterTp(options),
   });
   return result.signals;
 }

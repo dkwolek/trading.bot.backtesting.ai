@@ -2,19 +2,30 @@ import { useMemo } from 'react';
 import t from '../../../locales';
 import { BOT_STATUS_VISIBLE_ACTIVITY } from '../botStatus.constants';
 import { countEvents, findLatestSnapshot, parseLine } from '../botStatus.parser';
-import { ParsedLogLine } from '../botStatus.types';
+import { ParsedLogLine, RemoteConfig, RemoteState } from '../botStatus.types';
 import SnapshotCards from './SnapshotCards';
 import CounterCards from './CounterCards';
 import ActivityFeed from './ActivityFeed';
 import SlotsList from './SlotsList';
+import TotalsCards from './TotalsCards';
 
 interface Props {
   lines: string[];
   logFile: string;
   fetchedAt: number;
+  state: RemoteState | null;
+  stateError: string | null;
+  config: RemoteConfig | null;
 }
 
-export default function StatusPanel({ lines, logFile, fetchedAt }: Props) {
+export default function StatusPanel({
+  lines,
+  logFile,
+  fetchedAt,
+  state,
+  stateError,
+  config,
+}: Props) {
   const parsed = useMemo<ParsedLogLine[]>(() => lines.map(parseLine), [lines]);
   const snapshot = useMemo(() => findLatestSnapshot(parsed), [parsed]);
   const counters = useMemo(() => countEvents(parsed), [parsed]);
@@ -31,6 +42,14 @@ export default function StatusPanel({ lines, logFile, fetchedAt }: Props) {
           {t.botStatus.logFile}: <span className="text-text">{logFile}</span>
         </span>
       </div>
+      {state ? (
+        <TotalsCards state={state} config={config} />
+      ) : (
+        <div className="bg-surface border border-border p-3 text-[11px] font-mono text-muted">
+          {t.botStatus.stateUnavailable}
+          {stateError && <span className="text-red ml-2">({stateError})</span>}
+        </div>
+      )}
       <SnapshotCards snapshot={snapshot} />
       <SlotsList slots={snapshot.slots} />
       <CounterCards counters={counters} />

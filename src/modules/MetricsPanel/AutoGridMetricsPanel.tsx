@@ -4,7 +4,6 @@ import {
   resolveAmountPerLevel,
   resolveAtrMultiplier,
   resolveAtrPeriod,
-  resolveChaseAfterTp,
   resolveCompounding,
   resolveStepPrice,
   resolveVolAdaptiveStep,
@@ -128,7 +127,6 @@ export default function AutoGridMetricsPanel() {
   const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
   const atrPeriod = resolveAtrPeriod(algoOptions);
   const atrMultiplier = resolveAtrMultiplier(algoOptions);
-  const chaseAfterTp = resolveChaseAfterTp(algoOptions);
 
   const simulation = useMemo(
     () =>
@@ -139,18 +137,8 @@ export default function AutoGridMetricsPanel() {
         volAdaptiveStep,
         atrPeriod,
         atrMultiplier,
-        chaseAfterTp,
       }),
-    [
-      candles,
-      stepPrice,
-      amountPerLevel,
-      compounding,
-      volAdaptiveStep,
-      atrPeriod,
-      atrMultiplier,
-      chaseAfterTp,
-    ]
+    [candles, stepPrice, amountPerLevel, compounding, volAdaptiveStep, atrPeriod, atrMultiplier]
   );
 
   if (candles.length === 0) {

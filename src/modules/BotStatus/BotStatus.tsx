@@ -22,7 +22,8 @@ export default function BotStatus() {
     BOT_STATUS_FORM_DEFAULTS,
     isBotStatusForm
   );
-  const { data, isLoading, errorMessage, isConnected, connect, disconnect } = useBotStatus();
+  const { data, isLoading, errorMessage, isConnected, connect, disconnect, refresh } =
+    useBotStatus();
 
   function handleConnect(password: string) {
     connect({ form, password });
@@ -35,12 +36,20 @@ export default function BotStatus() {
         onFormChange={setForm}
         onConnect={handleConnect}
         onDisconnect={disconnect}
+        onRefresh={refresh}
         isConnected={isConnected}
         isLoading={isLoading}
         errorMessage={errorMessage}
       />
       {data ? (
-        <StatusPanel lines={data.lines} logFile={data.logFile} fetchedAt={data.fetchedAt} />
+        <StatusPanel
+          lines={data.lines}
+          logFile={data.logFile}
+          fetchedAt={data.fetchedAt}
+          state={data.state}
+          stateError={data.stateError}
+          config={data.config}
+        />
       ) : (
         <div className="bg-surface border border-border p-6 text-[12px] font-mono text-muted">
           {isLoading ? t.botStatus.refreshing : t.botStatus.noData}

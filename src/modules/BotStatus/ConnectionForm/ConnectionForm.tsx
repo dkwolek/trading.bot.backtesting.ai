@@ -7,6 +7,7 @@ interface Props {
   onFormChange: (form: BotStatusForm) => void;
   onConnect: (password: string) => void;
   onDisconnect: () => void;
+  onRefresh: () => void;
   isConnected: boolean;
   isLoading: boolean;
   errorMessage: string | null;
@@ -17,6 +18,7 @@ export default function ConnectionForm({
   onFormChange,
   onConnect,
   onDisconnect,
+  onRefresh,
   isConnected,
   isLoading,
   errorMessage,
@@ -90,6 +92,16 @@ export default function ConnectionForm({
       >
         {isConnected ? t.botStatus.disconnect : t.botStatus.connect}
       </button>
+      {isConnected && (
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="px-3 py-1 bg-bg text-text text-[12px] font-medium border border-border hover:border-accent disabled:opacity-50"
+        >
+          {isLoading ? t.botStatus.refreshing : t.botStatus.refresh}
+        </button>
+      )}
       {errorMessage && (
         <span className="text-[11px] font-mono text-red truncate max-w-full" title={errorMessage}>
           {errorMessage}
