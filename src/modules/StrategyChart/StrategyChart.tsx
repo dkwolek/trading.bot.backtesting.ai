@@ -4,11 +4,12 @@ import ChartLineIcon from '../../components/Icons/ChartLineIcon';
 import t from '../../locales';
 import {
   resolveAmountPerLevel,
-  resolveAtrMultiplier,
-  resolveAtrPeriod,
-  resolveCompounding,
+  resolveAutoSizeAmount,
+  resolveDcaAllocationPct,
+  resolveMonthlyAmount,
+  resolveMonthlyMode,
+  resolveMonthlyRangePct,
   resolveStepPrice,
-  resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
 import { Candle } from '../../types/global.types';
@@ -22,10 +23,11 @@ export default function StrategyChart({ candles }: Props) {
   const { initialAmount, algoOptions } = useTradingContext();
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
-  const compounding = resolveCompounding(algoOptions);
-  const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
-  const atrPeriod = resolveAtrPeriod(algoOptions);
-  const atrMultiplier = resolveAtrMultiplier(algoOptions);
+  const autoSizeAmount = resolveAutoSizeAmount(algoOptions);
+  const monthlyMode = resolveMonthlyMode(algoOptions);
+  const monthlyAmount = resolveMonthlyAmount(algoOptions);
+  const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
+  const dcaAllocationPct = resolveDcaAllocationPct(algoOptions);
 
   const histories = useMemo(() => {
     if (!candles || candles.length === 0) {
@@ -34,24 +36,25 @@ export default function StrategyChart({ candles }: Props) {
     const primary = simulateAutoGrid(candles, {
       stepPrice,
       amountPerLevel,
-      compounding,
-      volAdaptiveStep,
-      atrPeriod,
-      atrMultiplier,
+      autoSizeAmount,
+      initialAmount,
+      monthlyMode,
+      monthlyAmount,
+      monthlyRangePct,
+      dcaAllocationPct,
     }).realizedHistory;
-    if (!compounding) {
-      return { primary, comparison: null };
-    }
-    const comparison = simulateAutoGrid(candles, {
-      stepPrice,
-      amountPerLevel,
-      compounding: false,
-      volAdaptiveStep,
-      atrPeriod,
-      atrMultiplier,
-    }).realizedHistory;
-    return { primary, comparison };
-  }, [candles, stepPrice, amountPerLevel, compounding, volAdaptiveStep, atrPeriod, atrMultiplier]);
+    return { primary, comparison: null };
+  }, [
+    candles,
+    stepPrice,
+    amountPerLevel,
+    autoSizeAmount,
+    initialAmount,
+    monthlyMode,
+    monthlyAmount,
+    monthlyRangePct,
+    dcaAllocationPct,
+  ]);
 
   const { chartPaneRef, hasCandles } = useStrategyChart(
     candles,

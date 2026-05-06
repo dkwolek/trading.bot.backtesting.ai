@@ -11,8 +11,12 @@ export interface TradeRow {
 export function buildRows(trades: Trade[], initialAmount: number, totalSlots: number): TradeRow[] {
   let balance = initialAmount;
   return trades.map((trade) => {
-    const deployedFraction = trade.quantity / totalSlots;
-    const tradeAmount = balance * deployedFraction;
+    // Prefer the actual cost the algo reports (auto-grid attaches it
+    // per cycle so monthly mode's drifting amountPerLevel surfaces
+    // correctly). Fall back to the legacy "balance × deployed
+    // fraction" estimate for algos that don't carry cost.
+    const tradeAmount =
+      typeof trade.cost === 'number' ? trade.cost : balance * (trade.quantity / totalSlots);
     const dollarPnl = tradeAmount * (trade.pnlPercent / 100);
     balance += dollarPnl;
     return { trade, tradeAmount, dollarPnl, balance };

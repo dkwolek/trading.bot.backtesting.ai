@@ -4,9 +4,9 @@ import { Trade } from '../../../types/algo.types';
 import { Candle } from '../../../types/global.types';
 import { toUTCTimestamp } from '../chart.utils';
 
-interface CompoundEventMarker {
+interface DcaMarker {
   time: number;
-  amountPerLevel: number;
+  price: number;
 }
 
 interface Props {
@@ -14,13 +14,15 @@ interface Props {
   seriesRef: React.MutableRefObject<ISeriesApi<'Line'> | null>;
   candles: Candle[];
   trades?: Trade[];
-  compoundEvents?: CompoundEventMarker[];
+  dcaMarkers?: DcaMarker[];
 }
 
 const BUY_COLOR = '#00d4aa';
 const SELL_COLOR = '#ff4757';
-const COMPOUND_COLOR = '#a78bfa';
+const DCA_COLOR = '#3b82f6';
 const ARROW_SIZE = 6;
+const DCA_DOT_RADIUS = 2;
+const DCA_MIN_SPACING_PX = 14;
 const LABEL_GAP = 2;
 const FONT = '9px monospace';
 const MAX_MARKERS = 200;
@@ -113,13 +115,7 @@ function drawArrow(
 // reconciliation can't leak ghost elements during zoom/pan, and
 // positions land exactly on the level price (unlike setMarkers which
 // anchors above/below the line value).
-export default function MarkerCanvas({
-  chartRef,
-  seriesRef,
-  candles,
-  trades,
-  compoundEvents,
-}: Props) {
+export default function MarkerCanvas({ chartRef, seriesRef, candles, trades, dcaMarkers }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -167,28 +163,31 @@ export default function MarkerCanvas({
       ctx.font = FONT;
       ctx.textAlign = 'center';
 
-      // Compound-event indicators: dashed vertical line + label tag at
-      // the top of the chart for each amountPerLevel bump.
-      if (compoundEvents && compoundEvents.length > 0) {
-        ctx.strokeStyle = COMPOUND_COLOR;
-        ctx.fillStyle = COMPOUND_COLOR;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        for (const event of compoundEvents) {
-          if (event.time < fromTime || event.time > toTime) {
+      // DCA baseline dots: one tiny blue circle per actual DCA buy
+      // event (passed in from the simulation, not derived from
+      // candles). Per-candle dense dots are decimated by
+      // `DCA_MIN_SPACING_PX` so a 1m × 12M dataset doesn't paint
+      // 500k overlapping points; sparse monthly events draw 1:1.
+      if (dcaMarkers && dcaMarkers.length > 0) {
+        ctx.fillStyle = DCA_COLOR;
+        let lastDcaX = Number.NEGATIVE_INFINITY;
+        for (const marker of dcaMarkers) {
+          if (marker.time < fromTime || marker.time > toTime) {
             continue;
           }
-          const eventX = chart.timeScale().timeToCoordinate(toUTCTimestamp(event.time));
-          if (eventX === null) {
+          const dcaX = chart.timeScale().timeToCoordinate(toUTCTimestamp(marker.time));
+          const dcaY = series.priceToCoordinate(marker.price);
+          if (dcaX === null || dcaY === null) {
             continue;
           }
+          if (dcaX - lastDcaX < DCA_MIN_SPACING_PX) {
+            continue;
+          }
+          lastDcaX = dcaX;
           ctx.beginPath();
-          ctx.moveTo(eventX, 0);
-          ctx.lineTo(eventX, targetH);
-          ctx.stroke();
-          ctx.fillText(`$${event.amountPerLevel}`, eventX, 10);
+          ctx.arc(dcaX, dcaY, DCA_DOT_RADIUS, 0, Math.PI * 2);
+          ctx.fill();
         }
-        ctx.setLineDash([]);
       }
 
       if (specs.length === 0) {
@@ -300,7 +299,7 @@ export default function MarkerCanvas({
       }
       window.removeEventListener('resize', handleResize);
     };
-  }, [chartRef, seriesRef, trades, compoundEvents]);
+  }, [chartRef, seriesRef, trades, dcaMarkers]);
 
   return (
     <canvas

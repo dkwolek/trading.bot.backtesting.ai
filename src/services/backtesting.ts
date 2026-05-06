@@ -66,6 +66,12 @@ function buildTrades(signals: Signal[]): Trade[] {
           price: buy.price,
           time: buy.time,
         }));
+        let cost: number | undefined;
+        for (const buy of buyQueue) {
+          if (typeof buy.cost === 'number') {
+            cost = (cost ?? 0) + buy.cost;
+          }
+        }
         trades.push({
           entryTime,
           exitTime: signal.time,
@@ -76,6 +82,7 @@ function buildTrades(signals: Signal[]): Trade[] {
           pnlPercent,
           quantity: buyQueue.length,
           levels,
+          cost,
         });
         buyQueue.length = 0;
       } else {
@@ -167,7 +174,11 @@ export function runBacktest(
   initialAmount: number,
   options: AlgoOptions
 ): BacktestResult {
-  const signals = algorithm.run(candles, options);
+  // Inject initialAmount via a private option key so auto-grid's
+  // auto-size mode can derive amountPerLevel without changing the
+  // Algorithm.run signature.
+  const enrichedOptions = { ...options, __autoGridInitialAmount: initialAmount };
+  const signals = algorithm.run(candles, enrichedOptions);
   const trades = buildTrades(signals);
   const totalSlots = resolveTotalSlots(options, initialAmount);
   const metrics = computeMetrics(trades, initialAmount, totalSlots);

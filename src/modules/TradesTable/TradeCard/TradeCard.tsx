@@ -86,8 +86,14 @@ export default function TradeCard({ row, highlighted, striped, requiredCapital, 
           <span className={color}>{formatPnlPercent(portfolioPnlPct)}</span>
         </div>
         <div className="flex justify-between text-[10px] font-mono">
-          <span className="text-muted">{formatBalance(row.tradeAmount)}</span>
-          <span className="text-text">{formatBalance(row.balance)}</span>
+          <span className="text-muted">
+            <span className="text-[9px] tracking-wider uppercase mr-1">inv</span>
+            {formatBalance(row.tradeAmount)}
+          </span>
+          <span className="text-text">
+            <span className="text-[9px] tracking-wider uppercase text-muted mr-1">bal</span>
+            {formatBalance(row.balance)}
+          </span>
         </div>
       </div>
     </div>

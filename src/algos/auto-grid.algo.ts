@@ -3,28 +3,22 @@ import { TRADE_FEE } from '../constants/fees.constants';
 import t from '../locales';
 import { AlgoOptions, ControlDef, Signal } from '../types/algo.types';
 import { Candle } from '../types/global.types';
-import { meanATR } from '../utils/indicators';
 
 const DEFAULT_STEP_PRICE = 25;
 const DEFAULT_AMOUNT_PER_LEVEL = 10;
-const DEFAULT_COMPOUNDING = false;
-const DEFAULT_VOL_ADAPTIVE_STEP = false;
-const DEFAULT_ATR_PERIOD = 14;
-const DEFAULT_ATR_MULTIPLIER = 0.5;
-
-// Each compound bump scales `amountPerLevel` by this fraction (10%) and
-// requires `levelCount * amountPerLevel * COMPOUND_RATIO` fresh realised
-// profit. Threshold scales with current size so each bump costs more to
-// earn — keeps the relative growth constant instead of fading out as
-// the +$1/level rule did once amountPerLevel got large.
-const COMPOUND_RATIO = 0.1;
+const DEFAULT_AUTO_SIZE_AMOUNT = false;
+const DEFAULT_MONTHLY_MODE = false;
+const DEFAULT_MONTHLY_AMOUNT = 1000;
+const DEFAULT_MONTHLY_RANGE_PCT = 50;
+const DEFAULT_DCA_ALLOCATION_PCT = 0;
 
 export const AUTO_GRID_STEP_PRICE_KEY = 'autoGridStepPrice';
 export const AUTO_GRID_AMOUNT_PER_LEVEL_KEY = 'autoGridAmountPerLevel';
-export const AUTO_GRID_COMPOUNDING_KEY = 'autoGridCompounding';
-export const AUTO_GRID_VOL_ADAPTIVE_STEP_KEY = 'autoGridVolAdaptiveStep';
-export const AUTO_GRID_ATR_PERIOD_KEY = 'autoGridAtrPeriod';
-export const AUTO_GRID_ATR_MULTIPLIER_KEY = 'autoGridAtrMultiplier';
+export const AUTO_GRID_AUTO_SIZE_AMOUNT_KEY = 'autoGridAutoSizeAmount';
+export const AUTO_GRID_MONTHLY_MODE_KEY = 'autoGridMonthlyMode';
+export const AUTO_GRID_MONTHLY_AMOUNT_KEY = 'autoGridMonthlyAmount';
+export const AUTO_GRID_MONTHLY_RANGE_KEY = 'autoGridMonthlyRange';
+export const AUTO_GRID_DCA_ALLOCATION_KEY = 'autoGridDcaAllocation';
 
 export const controls: ControlDef[] = [
   {
@@ -36,7 +30,6 @@ export const controls: ControlDef[] = [
     max: 1000,
     step: 5,
     group: 'Levels',
-    disabledWhen: { key: AUTO_GRID_VOL_ADAPTIVE_STEP_KEY, value: true },
   },
   {
     key: AUTO_GRID_AMOUNT_PER_LEVEL_KEY,
@@ -47,40 +40,52 @@ export const controls: ControlDef[] = [
     max: 1000,
     step: 5,
     group: 'Levels',
+    disabledWhen: { key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY, value: true },
   },
   {
-    key: AUTO_GRID_COMPOUNDING_KEY,
-    title: t.autoGridControls.compounding,
+    key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY,
+    title: t.autoGridControls.autoSizeAmount,
     type: 'checkbox',
-    defaultValue: DEFAULT_COMPOUNDING,
+    defaultValue: DEFAULT_AUTO_SIZE_AMOUNT,
     group: 'Levels',
+    disabledWhen: { key: AUTO_GRID_MONTHLY_MODE_KEY, value: true },
   },
   {
-    key: AUTO_GRID_VOL_ADAPTIVE_STEP_KEY,
-    title: t.autoGridControls.volAdaptiveStep,
+    key: AUTO_GRID_MONTHLY_MODE_KEY,
+    title: t.autoGridControls.monthlyMode,
     type: 'checkbox',
-    defaultValue: DEFAULT_VOL_ADAPTIVE_STEP,
-    group: 'Vol-adaptive step',
+    defaultValue: DEFAULT_MONTHLY_MODE,
+    group: 'Monthly',
   },
   {
-    key: AUTO_GRID_ATR_PERIOD_KEY,
-    title: t.autoGridControls.atrPeriod,
+    key: AUTO_GRID_MONTHLY_AMOUNT_KEY,
+    title: t.autoGridControls.monthlyAmount,
     type: 'slider',
-    defaultValue: DEFAULT_ATR_PERIOD,
+    defaultValue: DEFAULT_MONTHLY_AMOUNT,
+    min: 100,
+    max: 10000,
+    step: 100,
+    group: 'Monthly',
+  },
+  {
+    key: AUTO_GRID_MONTHLY_RANGE_KEY,
+    title: t.autoGridControls.monthlyRange,
+    type: 'slider',
+    defaultValue: DEFAULT_MONTHLY_RANGE_PCT,
     min: 5,
-    max: 200,
-    step: 1,
-    group: 'Vol-adaptive step',
+    max: 95,
+    step: 5,
+    group: 'Monthly',
   },
   {
-    key: AUTO_GRID_ATR_MULTIPLIER_KEY,
-    title: t.autoGridControls.atrMultiplier,
+    key: AUTO_GRID_DCA_ALLOCATION_KEY,
+    title: t.autoGridControls.dcaAllocation,
     type: 'slider',
-    defaultValue: DEFAULT_ATR_MULTIPLIER,
-    min: 0.1,
-    max: 5,
-    step: 0.1,
-    group: 'Vol-adaptive step',
+    defaultValue: DEFAULT_DCA_ALLOCATION_PCT,
+    min: 0,
+    max: 100,
+    step: 5,
+    group: 'Monthly',
   },
 ];
 
@@ -98,28 +103,36 @@ export function resolveAmountPerLevel(options: AlgoOptions): number {
     : DEFAULT_AMOUNT_PER_LEVEL;
 }
 
-export function resolveCompounding(options: AlgoOptions): boolean {
-  const value = options[AUTO_GRID_COMPOUNDING_KEY];
-  return typeof value === 'boolean' ? value : DEFAULT_COMPOUNDING;
+export function resolveAutoSizeAmount(options: AlgoOptions): boolean {
+  const value = options[AUTO_GRID_AUTO_SIZE_AMOUNT_KEY];
+  return typeof value === 'boolean' ? value : DEFAULT_AUTO_SIZE_AMOUNT;
 }
 
-export function resolveVolAdaptiveStep(options: AlgoOptions): boolean {
-  const value = options[AUTO_GRID_VOL_ADAPTIVE_STEP_KEY];
-  return typeof value === 'boolean' ? value : DEFAULT_VOL_ADAPTIVE_STEP;
+export function resolveMonthlyMode(options: AlgoOptions): boolean {
+  const value = options[AUTO_GRID_MONTHLY_MODE_KEY];
+  return typeof value === 'boolean' ? value : DEFAULT_MONTHLY_MODE;
 }
 
-export function resolveAtrPeriod(options: AlgoOptions): number {
-  const value = options[AUTO_GRID_ATR_PERIOD_KEY];
+export function resolveMonthlyAmount(options: AlgoOptions): number {
+  const value = options[AUTO_GRID_MONTHLY_AMOUNT_KEY];
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    return DEFAULT_ATR_PERIOD;
+    return DEFAULT_MONTHLY_AMOUNT;
   }
-  return Math.max(2, Math.floor(value));
+  return value;
 }
 
-export function resolveAtrMultiplier(options: AlgoOptions): number {
-  const value = options[AUTO_GRID_ATR_MULTIPLIER_KEY];
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    return DEFAULT_ATR_MULTIPLIER;
+export function resolveMonthlyRangePct(options: AlgoOptions): number {
+  const value = options[AUTO_GRID_MONTHLY_RANGE_KEY];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 100) {
+    return DEFAULT_MONTHLY_RANGE_PCT;
+  }
+  return value;
+}
+
+export function resolveDcaAllocationPct(options: AlgoOptions): number {
+  const value = options[AUTO_GRID_DCA_ALLOCATION_KEY];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    return DEFAULT_DCA_ALLOCATION_PCT;
   }
   return value;
 }
@@ -154,15 +167,20 @@ export interface AutoGridSimulation {
   lockedLevels: LockedLevel[];
   endTime: number;
   signals: Signal[];
-  compoundEvents: CompoundEvent[]; // when amountPerLevel was bumped
-  // Per-cycle snapshot of cumulative realised PnL — drives the strategy
-  // performance chart so it matches `totalProfit` exactly (including
-  // compounded amountPerLevel bumps that buildTrades/computeMetrics
-  // can't see, since they only carry pnlPercent).
   realizedHistory: RealizedSnapshot[];
   uniqueLevelsTraded: number; // distinct level indices that had ≥ 1 buy
-  requiredCapitalActual: number; // uniqueLevelsTraded × initial amountPerLevel
-  effectiveStepPrice: number; // step actually used (= ATR-derived if vol-adaptive)
+  requiredCapitalActual: number;
+  totalDeposited: number; // initialAmount + monthly contributions
+  monthlyResets: number; // count of new-month grid resets
+  // Hybrid DCA portion. dcaCost = total $ spent on the hodl bag
+  // (initial + monthly slices). dcaValue = current mark-to-market
+  // value at the dataset's last close. dcaPnl = value − cost.
+  dcaCost: number;
+  dcaValue: number;
+  dcaPnl: number;
+  // hybridNetPnl combines grid net PnL + DCA PnL — the actual money
+  // the user makes when running the bot in mixed mode.
+  hybridNetPnl: number;
 }
 
 export interface RealizedSnapshot {
@@ -236,52 +254,46 @@ export function computeMaxDropInfo(candles: Candle[], stepPrice: number): MaxDro
 export interface BotSimConfig {
   stepPrice: number;
   amountPerLevel: number;
-  // When true, every dollar of realised PnL per grid level is folded
-  // back into amountPerLevel (e.g. 20 levels and +$20 realised → +$1
-  // each, levelSize bumps from $10 → $11). The bumps fire whenever
-  // the threshold is crossed; emitted as a 'COMPOUND' marker so the
-  // chart can show when each level-size jump happened.
-  compounding?: boolean;
-  // When true, `stepPrice` is ignored — sim computes mean ATR(period)
-  // over the dataset and uses `meanATR × atrMultiplier` as the
-  // effective step. Auto-tunes step magnitude to the asset's
-  // volatility (BTC at $80k vs ETH at $2500 vs SOL at $150 each get
-  // an appropriate step without manual intervention).
-  volAdaptiveStep?: boolean;
-  atrPeriod?: number;
-  atrMultiplier?: number;
+  // When true, amountPerLevel auto-derives from
+  // `initialAmount / floor(sessionAnchor / stepPrice)`. Anchor starts
+  // at the first candle's close and bumps up whenever a chase entry
+  // opens at a price above the current anchor — each anchor bump
+  // shrinks `amountPerLevel` so deployed capital scales with how
+  // many levels the grid currently covers. Mutually exclusive with
+  // monthly mode.
+  autoSizeAmount?: boolean;
+  initialAmount?: number;
+  // Monthly contribution mode: every calendar month the bot adds
+  // `monthlyAmount` to free capital, cancels pending grid orders
+  // (in sim that's a no-op), and rebuilds the grid covering
+  // [currentPrice × (1 − monthlyRangePct/100), currentPrice].
+  // amountPerLevel = freeCapital / numLevels at rebuild time.
+  // Owned bag positions are preserved across resets and cleared
+  // only by their own TP. Mutually exclusive with autoSizeAmount.
+  monthlyMode?: boolean;
+  monthlyAmount?: number;
+  monthlyRangePct?: number;
+  // Hybrid DCA + grid: at every monthly contribution (and the initial
+  // deposit), this fraction of the cash is parked into a permanent
+  // hodl bag bought at the current candle's close. The remainder funds
+  // the grid as before. The hodl bag never sells — its current value
+  // is added to the simulation's net PnL at the end. With dcaAllocation
+  // = 0 the behaviour is unchanged; with 100 the bot is pure DCA.
+  dcaAllocationPct?: number;
 }
 
-export interface CompoundEvent {
-  time: number;
-  amountPerLevel: number;
-}
-
-/**
- * Infinite-grid simulation: no slot cap, no anchor, no shift logic. Each
- * price level (integer multiple of `stepPrice`) cycles independently —
- * a buy fires the first time `low` reaches the level after price was
- * above it, a TP fires when `high` reaches `level + stepPrice` for an
- * owned slot, and the level becomes immediately re-fillable. Reflects
- * "what if I had unlimited capital and a buy + TP at every grid level".
- */
 export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoGridSimulation {
-  const compounding = config.compounding ?? false;
-  const volAdaptive = config.volAdaptiveStep ?? false;
-  const atrPeriod = Math.max(2, Math.floor(config.atrPeriod ?? DEFAULT_ATR_PERIOD));
-  const atrMultiplier = Math.max(0.01, config.atrMultiplier ?? DEFAULT_ATR_MULTIPLIER);
-
-  // Resolve effective step BEFORE the empty-data guard — vol-adaptive
-  // mode replaces config.stepPrice entirely. Falls back to manual
-  // stepPrice when ATR can't be computed (dataset shorter than
-  // atrPeriod).
-  let stepPrice = config.stepPrice;
-  if (volAdaptive && candles.length > 0) {
-    const atr = meanATR(candles, atrPeriod);
-    if (atr !== null && atr > 0) {
-      stepPrice = atr * atrMultiplier;
-    }
-  }
+  const autoSizeAmount = config.autoSizeAmount ?? false;
+  const initialAmount = config.initialAmount ?? 0;
+  const monthlyMode = config.monthlyMode ?? false;
+  const monthlyAmount = Math.max(0, config.monthlyAmount ?? DEFAULT_MONTHLY_AMOUNT);
+  const monthlyRangePct = Math.max(
+    1,
+    Math.min(99, config.monthlyRangePct ?? DEFAULT_MONTHLY_RANGE_PCT)
+  );
+  const dcaAllocationFraction =
+    Math.max(0, Math.min(100, config.dcaAllocationPct ?? DEFAULT_DCA_ALLOCATION_PCT)) / 100;
+  const stepPrice = config.stepPrice;
 
   if (candles.length === 0 || stepPrice <= 0 || config.amountPerLevel <= 0) {
     return {
@@ -296,76 +308,72 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       lockedLevels: [],
       endTime: 0,
       signals: [],
-      compoundEvents: [],
       realizedHistory: [],
       uniqueLevelsTraded: 0,
       requiredCapitalActual: 0,
-      effectiveStepPrice: stepPrice,
+      totalDeposited: initialAmount,
+      monthlyResets: 0,
+      dcaCost: 0,
+      dcaValue: 0,
+      dcaPnl: 0,
+      hybridNetPnl: 0,
     };
   }
-
-  // Number of grid levels covered by the period's price range — drives
-  // the compounding threshold: each bump needs `levelCount × current
-  // amountPerLevel × COMPOUND_RATIO` of fresh realised profit (i.e.
-  // enough to grow every level by the ratio).
-  let rangeMinLow = Number.POSITIVE_INFINITY;
-  let rangeMaxHigh = Number.NEGATIVE_INFINITY;
-  for (const candle of candles) {
-    if (candle.low < rangeMinLow) {
-      rangeMinLow = candle.low;
-    }
-    if (candle.high > rangeMaxHigh) {
-      rangeMaxHigh = candle.high;
-    }
-  }
-  const levelCount = Math.max(1, Math.ceil((rangeMaxHigh - rangeMinLow) / stepPrice));
 
   // Owned slots keyed by integer level index — guarantees uniqueness even
   // for non-round step sizes that would otherwise drift under repeated
   // float arithmetic.
   const owned = new Map<number, OwnedSlot>();
   let totalProfit = 0;
-  let compoundedAmount = 0;
   let amountPerLevel = config.amountPerLevel;
+
+  // Auto-size: amountPerLevel auto-derives from
+  // `initialAmount / floor(sessionAnchor / stepPrice)`.
+  let sessionAnchorIndex = 0;
+  if (autoSizeAmount && !monthlyMode && initialAmount > 0) {
+    sessionAnchorIndex = Math.max(1, Math.floor(candles[0].close / stepPrice));
+    amountPerLevel = initialAmount / sessionAnchorIndex;
+  }
+
+  // Monthly mode bookkeeping.
+  let freeCapital = initialAmount;
+  let totalDeposited = initialAmount;
+  let monthlyResets = 0;
+  let lastMonthKey = -1;
+  let monthlyFloorIndex = 0;
+  let monthlyCeilingIndex = 0;
+  if (monthlyMode) {
+    monthlyCeilingIndex = Math.max(1, Math.floor(candles[0].close / stepPrice));
+    monthlyFloorIndex = Math.max(
+      0,
+      Math.floor((candles[0].close * (1 - monthlyRangePct / 100)) / stepPrice)
+    );
+  }
+
+  // Hybrid DCA bag — accumulated base from periodic permanent buys.
+  // Active only when monthly mode is on AND dcaAllocationFraction > 0.
+  let dcaBase = 0;
+  let dcaCost = 0;
+  function dcaBuy(amount: number, price: number) {
+    if (amount <= 0 || price <= 0) {
+      return;
+    }
+    dcaBase += (amount * (1 - TRADE_FEE)) / price;
+    dcaCost += amount;
+    freeCapital -= amount;
+  }
+
   let cycles = 0;
   let maxCapital = 0;
   const signals: Signal[] = [];
-  const compoundEvents: CompoundEvent[] = [];
   const realizedHistory: RealizedSnapshot[] = [];
-  // Track distinct level indices the bot ever bought — drives the
-  // Required capital metric (uniqueLevelsTraded × amountPerLevel).
   const tradedLevels = new Set<number>();
 
-  // We use the previous candle's close as the upper boundary for new
-  // fills: a buy at level L fires only if price was above L at the end
-  // of the prior candle and dropped to ≤ L during this one. Using high
-  // instead would buy a level on the way UP (e.g. price rises through
-  // $2320 to $2330, then drops to $2315 — that's not a "down cross" of
-  // $2320, so the buy at $2320 should wait for a later candle that
-  // actually crosses $2320 going down).
-  let prevCloseIndex = Math.floor(candles[0].open / stepPrice);
-
-  for (const candle of candles) {
-    // ceil for the low so we only count grid levels at or above `low` —
-    // floor would buy the level just below low (e.g. low=$2308, step=$10
-    // → floor=230=$2300), firing a phantom cycle whose TP shows up on the
-    // very next candle.
-    const lowIndex = Math.ceil(candle.low / stepPrice);
-    const highIndex = Math.floor(candle.high / stepPrice);
-
-    // 1. TPs against candle.high — every owned whose TP price (level + step)
-    //    fits below the high closes for profit. Sell side is fee-free;
-    //    only the buy paid a maker fee, already baked into volume.
-    //
-    //    Every TP also opens a fresh buy at the level we just sold at
-    //    (one step above the closed entry) — chase-after-TP is now
-    //    always on. That new slot can itself TP within the same candle
-    //    if the high reaches its target, cascading through multiple
-    //    levels in one go. We therefore wrap the TP scan in a
-    //    `while (madeProgress)` loop so each pass re-considers slots
-    //    created by the previous pass — without it a wide-range candle
-    //    on a strong uptrend would only fire one cycle when it should
-    //    fire many.
+  // TP scan + chase cascading. Called twice per candle (before fills
+  // and after fills) so same-bar buy-then-TP cycles get caught — that's
+  // what closes the gap between low-resolution backtest and live bot
+  // behaviour, where limit orders fire on every tick crossing.
+  function runTpScan(candle: Candle, highIndex: number) {
     let tpProgress = true;
     while (tpProgress) {
       tpProgress = false;
@@ -374,6 +382,9 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
         if (highIndex >= tpIndex) {
           const tpPrice = tpIndex * stepPrice;
           totalProfit += slot.volume * tpPrice - slot.cost;
+          if (monthlyMode) {
+            freeCapital += slot.volume * tpPrice;
+          }
           cycles += 1;
           realizedHistory.push({ time: candle.time, cumulative: totalProfit });
           signals.push({
@@ -381,6 +392,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
             type: SignalType.Buy,
             price: slot.level,
             label: 'L1',
+            cost: slot.cost,
           });
           signals.push({
             time: candle.time,
@@ -391,74 +403,130 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
           });
           owned.delete(levelIndex);
           tpProgress = true;
-
-          // Compounding: scale `amountPerLevel` by COMPOUND_RATIO whenever
-          // realised profit covers the same ratio worth of grid coverage.
-          // Threshold uses the *current* amountPerLevel so each bump costs
-          // more to earn than the previous — relative growth stays
-          // constant instead of fading out at high amountPerLevel values.
-          if (compounding) {
-            while (true) {
-              const threshold = levelCount * amountPerLevel * COMPOUND_RATIO;
-              if (totalProfit - compoundedAmount < threshold) {
-                break;
-              }
-              compoundedAmount += threshold;
-              amountPerLevel = amountPerLevel * (1 + COMPOUND_RATIO);
-              compoundEvents.push({ time: candle.time, amountPerLevel });
-            }
-          }
-
-          // Chase: open a fresh buy at the level we just sold at
-          // (tpIndex) so the grid follows rising price. Always-on
-          // — without chase, pure uptrends leave the grid empty
-          // until the next pullback. Skips when that level is
-          // already owned (rare, possible if the candle also
-          // down-crossed the same level in the fill phase below).
           if (!owned.has(tpIndex)) {
-            const chaseLevelPrice = tpIndex * stepPrice;
-            const volume = (amountPerLevel * (1 - TRADE_FEE)) / chaseLevelPrice;
-            owned.set(tpIndex, {
-              level: chaseLevelPrice,
-              buyPrice: chaseLevelPrice,
-              volume,
-              cost: amountPerLevel,
-              ownedAt: candle.time,
-            });
-            tradedLevels.add(tpIndex);
+            const enoughCapital = !monthlyMode || freeCapital >= amountPerLevel;
+            if (enoughCapital) {
+              if (
+                autoSizeAmount &&
+                !monthlyMode &&
+                initialAmount > 0 &&
+                tpIndex > sessionAnchorIndex
+              ) {
+                sessionAnchorIndex = tpIndex;
+                amountPerLevel = initialAmount / sessionAnchorIndex;
+              }
+              const chaseLevelPrice = tpIndex * stepPrice;
+              const volume = (amountPerLevel * (1 - TRADE_FEE)) / chaseLevelPrice;
+              owned.set(tpIndex, {
+                level: chaseLevelPrice,
+                buyPrice: chaseLevelPrice,
+                volume,
+                cost: amountPerLevel,
+                ownedAt: candle.time,
+              });
+              tradedLevels.add(tpIndex);
+              if (monthlyMode) {
+                freeCapital -= amountPerLevel;
+              }
+            }
           }
         }
       }
     }
+  }
+
+  let prevCloseIndex = Math.floor(candles[0].open / stepPrice);
+
+  for (let candleIdx = 0; candleIdx < candles.length; candleIdx++) {
+    const candle = candles[candleIdx];
+    // 0. Monthly contribution + grid rebuild on the first candle of a
+    //    new calendar month. Bag (owned slots) is preserved — only the
+    //    grid bounds + amountPerLevel reset. freeCapital absorbs the
+    //    new monthlyAmount.
+    if (monthlyMode) {
+      const candleDate = new Date(candle.time * 1000);
+      const monthKey = candleDate.getUTCFullYear() * 12 + candleDate.getUTCMonth();
+      if (monthKey !== lastMonthKey) {
+        const monthDcaFraction = dcaAllocationFraction;
+        if (lastMonthKey === -1) {
+          // First candle: split the initial deposit into DCA bag +
+          // grid free pool. Initial freeCapital was seeded with
+          // initialAmount; we just siphon the DCA share off.
+          if (monthDcaFraction > 0 && initialAmount > 0) {
+            dcaBuy(initialAmount * monthDcaFraction, candle.close);
+          }
+        } else {
+          // Subsequent month — top up wallet, then siphon DCA share
+          // before rebuilding the grid.
+          freeCapital += monthlyAmount;
+          totalDeposited += monthlyAmount;
+          monthlyResets += 1;
+          if (monthDcaFraction > 0 && monthlyAmount > 0) {
+            dcaBuy(monthlyAmount * monthDcaFraction, candle.close);
+          }
+        }
+        monthlyCeilingIndex = Math.max(1, Math.floor(candle.close / stepPrice));
+        monthlyFloorIndex = Math.max(
+          0,
+          Math.floor((candle.close * (1 - monthlyRangePct / 100)) / stepPrice)
+        );
+        const numLevels = Math.max(1, monthlyCeilingIndex - monthlyFloorIndex);
+        amountPerLevel = freeCapital / numLevels;
+        sessionAnchorIndex = monthlyCeilingIndex;
+        lastMonthKey = monthKey;
+      }
+    }
+
+    const lowIndex = Math.ceil(candle.low / stepPrice);
+    const highIndex = Math.floor(candle.high / stepPrice);
+
+    // 1a. TPs against candle.high — close any owned position whose TP
+    //     price already sits at/below the high. Cascading chase rebuys
+    //     captured via while-progress loop in `runTpScan`.
+    runTpScan(candle, highIndex);
 
     // 2. Fills against candle.low — every level the price crossed going
     //    DOWN from the prior candle's close (between prevCloseIndex and
     //    lowIndex, inclusive) gets bought if no slot is currently owned.
+    //    Monthly mode reserves capital for levels above `priceFloor`
+    //    by skipping anything ≤ monthlyFloorIndex and gating each buy
+    //    on freeCapital. The upper bound is intentionally NOT capped
+    //    at monthlyCeiling — once chase pushed positions above it,
+    //    a subsequent price drop should refill those levels instead
+    //    of leaving the grid dormant until the next monthly reset.
     const fillCeiling = prevCloseIndex;
-    {
-      for (let levelIndex = fillCeiling; levelIndex >= lowIndex; levelIndex--) {
-        if (levelIndex <= 0) {
-          break;
-        }
-        if (owned.has(levelIndex)) {
-          continue;
-        }
-        const levelPrice = levelIndex * stepPrice;
-        // Maker fee is taken from the quote, so the base volume we
-        // actually receive is reduced proportionally.
-        const volume = (amountPerLevel * (1 - TRADE_FEE)) / levelPrice;
-        owned.set(levelIndex, {
-          level: levelPrice,
-          buyPrice: levelPrice,
-          volume,
-          cost: amountPerLevel,
-          ownedAt: candle.time,
-        });
-        tradedLevels.add(levelIndex);
+    for (let levelIndex = fillCeiling; levelIndex >= lowIndex; levelIndex--) {
+      if (levelIndex <= 0) {
+        break;
+      }
+      if (monthlyMode && levelIndex <= monthlyFloorIndex) {
+        break;
+      }
+      if (owned.has(levelIndex)) {
+        continue;
+      }
+      if (monthlyMode && freeCapital < amountPerLevel) {
+        break;
+      }
+      const levelPrice = levelIndex * stepPrice;
+      const volume = (amountPerLevel * (1 - TRADE_FEE)) / levelPrice;
+      owned.set(levelIndex, {
+        level: levelPrice,
+        buyPrice: levelPrice,
+        volume,
+        cost: amountPerLevel,
+        ownedAt: candle.time,
+      });
+      tradedLevels.add(levelIndex);
+      if (monthlyMode) {
+        freeCapital -= amountPerLevel;
       }
     }
 
-    const capitalDeployed = owned.size * amountPerLevel;
+    let capitalDeployed = 0;
+    for (const slot of owned.values()) {
+      capitalDeployed += slot.cost;
+    }
     if (capitalDeployed > maxCapital) {
       maxCapital = capitalDeployed;
     }
@@ -475,15 +543,12 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     openCost += slot.cost;
     openValue += slot.volume * finalPrice;
     lockedLevels.push({ level: slot.level, openedAt: slot.ownedAt });
-    // Emit Buy + synthetic OPEN Sell so the framework's buildTrades pairs
-    // them — that surfaces the unrealised PnL in the trades table without
-    // polluting realised metrics (computeMetrics filters out exitLabel
-    // === 'OPEN').
     signals.push({
       time: slot.ownedAt,
       type: SignalType.Buy,
       price: slot.level,
       label: 'L1',
+      cost: slot.cost,
     });
     signals.push({
       time: finalCandle.time,
@@ -494,6 +559,21 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     });
   }
   const unrealizedPnl = openValue - openCost;
+  const dcaValue = dcaBase * finalPrice;
+  const dcaPnl = dcaValue - dcaCost;
+
+  // Required capital denominator:
+  // - monthly mode: total cumulative deposits (the only meaningful
+  //   denominator since capital arrives over time)
+  // - auto-size: initialAmount (budget IS the capital by construction)
+  // - default: peak concurrent owned (matches user expectation that
+  //   "required capital = worst-moment locked")
+  let requiredCapitalActual = maxCapital;
+  if (monthlyMode) {
+    requiredCapitalActual = totalDeposited;
+  } else if (autoSizeAmount && initialAmount > 0) {
+    requiredCapitalActual = initialAmount;
+  }
 
   return {
     totalProfit,
@@ -507,24 +587,37 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     lockedLevels,
     endTime: finalCandle.time,
     signals,
-    compoundEvents,
     realizedHistory,
     uniqueLevelsTraded: tradedLevels.size,
-    requiredCapitalActual: tradedLevels.size * config.amountPerLevel,
-    effectiveStepPrice: stepPrice,
+    requiredCapitalActual,
+    totalDeposited,
+    monthlyResets,
+    dcaCost,
+    dcaValue,
+    dcaPnl,
+    hybridNetPnl: totalProfit + unrealizedPnl + dcaPnl,
   };
 }
 
-// Drives the backtest framework: emits one Buy/Sell pair per closed cycle,
-// adjacent in the array so buildTrades pairs them 1:1.
+// Special options key used by `runBacktest` to pass initialAmount into
+// the algo without changing the Algorithm signature.
+export const AUTO_GRID_INITIAL_AMOUNT_KEY = '__autoGridInitialAmount';
+
+function resolveInjectedInitialAmount(options: AlgoOptions): number {
+  const value = options[AUTO_GRID_INITIAL_AMOUNT_KEY];
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 export function run(candles: Candle[], options: AlgoOptions): Signal[] {
   const result = simulateAutoGrid(candles, {
     stepPrice: resolveStepPrice(options),
     amountPerLevel: resolveAmountPerLevel(options),
-    compounding: resolveCompounding(options),
-    volAdaptiveStep: resolveVolAdaptiveStep(options),
-    atrPeriod: resolveAtrPeriod(options),
-    atrMultiplier: resolveAtrMultiplier(options),
+    autoSizeAmount: resolveAutoSizeAmount(options),
+    initialAmount: resolveInjectedInitialAmount(options),
+    monthlyMode: resolveMonthlyMode(options),
+    monthlyAmount: resolveMonthlyAmount(options),
+    monthlyRangePct: resolveMonthlyRangePct(options),
+    dcaAllocationPct: resolveDcaAllocationPct(options),
   });
   return result.signals;
 }

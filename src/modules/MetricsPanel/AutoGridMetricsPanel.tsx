@@ -2,13 +2,15 @@ import { useMemo } from 'react';
 import { useTradingContext } from '../../context/TradingContext';
 import {
   resolveAmountPerLevel,
-  resolveAtrMultiplier,
-  resolveAtrPeriod,
-  resolveCompounding,
+  resolveAutoSizeAmount,
+  resolveDcaAllocationPct,
+  resolveMonthlyAmount,
+  resolveMonthlyMode,
+  resolveMonthlyRangePct,
   resolveStepPrice,
-  resolveVolAdaptiveStep,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
+import { simulateDCA } from '../../algos/dca.algo';
 
 interface MetricCardProps {
   label: string;
@@ -120,25 +122,43 @@ function pnlClass(value: number): string {
 }
 
 export default function AutoGridMetricsPanel() {
-  const { algoOptions, candles } = useTradingContext();
+  const { algoOptions, candles, initialAmount } = useTradingContext();
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
-  const compounding = resolveCompounding(algoOptions);
-  const volAdaptiveStep = resolveVolAdaptiveStep(algoOptions);
-  const atrPeriod = resolveAtrPeriod(algoOptions);
-  const atrMultiplier = resolveAtrMultiplier(algoOptions);
+  const autoSizeAmount = resolveAutoSizeAmount(algoOptions);
+  const monthlyMode = resolveMonthlyMode(algoOptions);
+  const monthlyAmount = resolveMonthlyAmount(algoOptions);
+  const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
+  const dcaAllocationPct = resolveDcaAllocationPct(algoOptions);
+
+  const dca = useMemo(
+    () => simulateDCA(candles, initialAmount, monthlyMode ? monthlyAmount : 0),
+    [candles, initialAmount, monthlyMode, monthlyAmount]
+  );
 
   const simulation = useMemo(
     () =>
       simulateAutoGrid(candles, {
         stepPrice,
         amountPerLevel,
-        compounding,
-        volAdaptiveStep,
-        atrPeriod,
-        atrMultiplier,
+        autoSizeAmount,
+        initialAmount,
+        monthlyMode,
+        monthlyAmount,
+        monthlyRangePct,
+        dcaAllocationPct,
       }),
-    [candles, stepPrice, amountPerLevel, compounding, volAdaptiveStep, atrPeriod, atrMultiplier]
+    [
+      candles,
+      stepPrice,
+      amountPerLevel,
+      autoSizeAmount,
+      initialAmount,
+      monthlyMode,
+      monthlyAmount,
+      monthlyRangePct,
+      dcaAllocationPct,
+    ]
   );
 
   if (candles.length === 0) {
@@ -154,13 +174,20 @@ export default function AutoGridMetricsPanel() {
     );
   }
 
+  const requiredCapital = simulation.requiredCapitalActual;
+  const requiredLabel = monthlyMode
+    ? `monthly · ${simulation.monthlyResets} resets`
+    : `peak concurrent · ${simulation.uniqueLevelsTraded} unique levels`;
+  const hybridActive = monthlyMode && dcaAllocationPct > 0;
+  const showColumns = hybridActive ? 'grid-cols-6' : 'grid-cols-5';
+
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className={`grid ${showColumns} gap-2`}>
       <DualMetricCard
         primaryLabel="Net"
-        primaryValue={formatPercent(simulation.netPnl, simulation.requiredCapitalActual)}
+        primaryValue={formatPercent(simulation.netPnl, requiredCapital)}
         primaryClass={pnlClass(simulation.netPnl)}
-        secondaryLabel="Net $"
+        secondaryLabel="Grid only $"
         secondaryValue={`${simulation.netPnl >= 0 ? '+' : '-'}$${Math.abs(simulation.netPnl).toFixed(2)}`}
         secondaryClass={pnlClass(simulation.netPnl)}
       />
@@ -173,7 +200,7 @@ export default function AutoGridMetricsPanel() {
             <span
               className={`font-mono text-[13px] font-medium truncate ${pnlClass(simulation.totalProfit)}`}
             >
-              {formatPercent(simulation.totalProfit, simulation.requiredCapitalActual)}
+              {formatPercent(simulation.totalProfit, requiredCapital)}
             </span>
             <span className={`font-mono text-[11px] truncate ${pnlClass(simulation.totalProfit)}`}>
               {formatDollarsSigned(simulation.totalProfit)}
@@ -188,7 +215,7 @@ export default function AutoGridMetricsPanel() {
             <span
               className={`font-mono text-[11px] font-medium truncate ${pnlClass(simulation.unrealizedPnl)}`}
             >
-              {formatPercent(simulation.unrealizedPnl, simulation.requiredCapitalActual)}
+              {formatPercent(simulation.unrealizedPnl, requiredCapital)}
             </span>
             <span
               className={`font-mono text-[10px] truncate ${pnlClass(simulation.unrealizedPnl)}`}
@@ -200,12 +227,8 @@ export default function AutoGridMetricsPanel() {
       </div>
       <DualMetricCard
         primaryLabel="Required capital"
-        primaryValue={formatDollars(simulation.requiredCapitalActual)}
-        secondaryLabel={
-          volAdaptiveStep
-            ? `step $${simulation.effectiveStepPrice.toFixed(2)} · ${simulation.uniqueLevelsTraded} levels`
-            : `${simulation.uniqueLevelsTraded} levels traded`
-        }
+        primaryValue={formatDollars(requiredCapital)}
+        secondaryLabel={requiredLabel}
         secondaryValue={`Open ${formatDollars(simulation.openPositionsCost)}`}
         secondaryClass={simulation.openPositionsCost > 0 ? 'text-yellow-400' : 'text-text'}
       />
@@ -216,6 +239,24 @@ export default function AutoGridMetricsPanel() {
         secondaryValue={String(simulation.openPositionsAtEnd)}
         secondaryClass={simulation.openPositionsAtEnd > 0 ? 'text-yellow-400' : 'text-text'}
       />
+      <DualMetricCard
+        primaryLabel="DCA baseline"
+        primaryValue={`${dca.netPct >= 0 ? '+' : '-'}${Math.abs(dca.netPct).toFixed(2)}%`}
+        primaryClass={pnlClass(dca.netPnl)}
+        secondaryLabel="vs hodl-by-DCA"
+        secondaryValue={formatDollarsSigned(dca.netPnl)}
+        secondaryClass={pnlClass(dca.netPnl)}
+      />
+      {hybridActive && (
+        <DualMetricCard
+          primaryLabel="Hybrid total"
+          primaryValue={formatPercent(simulation.hybridNetPnl, requiredCapital)}
+          primaryClass={pnlClass(simulation.hybridNetPnl)}
+          secondaryLabel={`grid + dca · ${dcaAllocationPct}%`}
+          secondaryValue={formatDollarsSigned(simulation.hybridNetPnl)}
+          secondaryClass={pnlClass(simulation.hybridNetPnl)}
+        />
+      )}
     </div>
   );
 }

@@ -28,32 +28,6 @@ describe('simulateAutoGrid', () => {
     expect(result.maxCapitalDeployed).toBeGreaterThan(0);
   });
 
-  it('vol-adaptive step overrides manual step with ATR × multiplier', () => {
-    // Saw-tooth with predictable true range so we can pin the expected
-    // step. Highs and lows are 20 apart on every candle and there's
-    // no gap between closes, so TR ≈ high − low = 20 for every candle.
-    // mean ATR(14) = 20, multiplier 0.5 → effective step = 10.
-    const candles: Candle[] = [];
-    for (let index = 0; index < 50; index++) {
-      const isDown = index % 2 === 0;
-      const close = isDown ? 2490 : 2510;
-      const open = close;
-      const low = close - 10;
-      const high = close + 10;
-      candles.push(makeCandle(1700000000 + index * 60, open, high, low, close));
-    }
-    const result = simulateAutoGrid(candles, {
-      stepPrice: 999, // ignored
-      amountPerLevel: 10,
-      volAdaptiveStep: true,
-      atrPeriod: 14,
-      atrMultiplier: 0.5,
-    });
-    expect(result.effectiveStepPrice).toBeGreaterThan(0);
-    expect(result.effectiveStepPrice).toBeLessThan(50);
-    expect(result.effectiveStepPrice).not.toBe(999);
-  });
-
   it('chase-after-tp cascades multiple cycles in a single uptrend candle', () => {
     // Seed candle at $90 fills L9. The climb candle opens at $100 (no
     // dip back to $90) and reaches $200 — chase cascades L9→L10→...→L19
@@ -73,6 +47,74 @@ describe('simulateAutoGrid', () => {
     expect(result.totalProfit).toBeGreaterThan(0);
     expect(result.openPositionsAtEnd).toBe(1);
     expect(result.lockedLevels[0].level).toBe(200);
+  });
+
+  it('auto-size derives amountPerLevel from initialAmount and the session anchor', () => {
+    // Anchor at $2000 with step $25 → 80 levels, amount = 10000/80 = $125.
+    // No price action, so the anchor never moves and amount stays at $125
+    // for the (one) fill that the seed candle produces.
+    const seed = makeCandle(1700000000, 2000, 2000, 2000, 2000);
+    const result = simulateAutoGrid([seed], {
+      stepPrice: 25,
+      amountPerLevel: 999, // ignored when autoSizeAmount is on
+      autoSizeAmount: true,
+      initialAmount: 10000,
+    });
+    expect(result.openPositionsAtEnd).toBe(1);
+    expect(result.openPositionsCost).toBeCloseTo(125, 2);
+  });
+
+  it('auto-size shrinks amountPerLevel as the chase pushes the anchor up', () => {
+    // Seed at $2000 fills L80. A wide candle reaching $2100 should
+    // cascade chase L80→L81→L82→L83→L84. Each upward chase bumps the
+    // session anchor and shrinks the per-level amount: $2000→$125,
+    // $2025→$123.46, $2050→$121.95, $2075→$120.48, $2100→$119.05. The
+    // final owned slot at L84 carries the smallest amount.
+    const seed = makeCandle(1700000000, 2000, 2000, 2000, 2000);
+    const climb = makeCandle(1700000060, 2025, 2100, 2025, 2100);
+    const candles = [seed, climb];
+
+    const result = simulateAutoGrid(candles, {
+      stepPrice: 25,
+      amountPerLevel: 999,
+      autoSizeAmount: true,
+      initialAmount: 10000,
+    });
+    expect(result.completedCycles).toBeGreaterThan(0);
+    expect(result.openPositionsAtEnd).toBe(1);
+    const lastSlot = result.lockedLevels[0];
+    expect(lastSlot.level).toBe(2100);
+    // Final entry uses the smallest amount: 10000 / 84.
+    expect(result.openPositionsCost).toBeCloseTo(10000 / 84, 2);
+  });
+
+  it('monthly mode tops up freeCapital and rebuilds the grid each calendar month', () => {
+    // Two calendar months at price 2000 (no price movement) — first
+    // candle: initial deposit ($10k) seeds month 1 grid. First candle
+    // of month 2 fires monthly contribution ($1000). monthlyResets
+    // counts boundaries crossed AFTER the first month, so 1.
+    // totalDeposited = 10000 + 1000 = 11000.
+    const m1Start = Math.floor(new Date('2024-01-15T00:00:00Z').getTime() / 1000);
+    const m1Mid = Math.floor(new Date('2024-01-25T00:00:00Z').getTime() / 1000);
+    const m2Start = Math.floor(new Date('2024-02-05T00:00:00Z').getTime() / 1000);
+    const candles: Candle[] = [
+      makeCandle(m1Start, 2000, 2000, 2000, 2000),
+      makeCandle(m1Mid, 2000, 2000, 2000, 2000),
+      makeCandle(m2Start, 2000, 2000, 2000, 2000),
+    ];
+
+    const result = simulateAutoGrid(candles, {
+      stepPrice: 25,
+      amountPerLevel: 999,
+      monthlyMode: true,
+      monthlyAmount: 1000,
+      monthlyRangePct: 50,
+      initialAmount: 10000,
+    });
+
+    expect(result.monthlyResets).toBe(1);
+    expect(result.totalDeposited).toBe(11000);
+    expect(result.requiredCapitalActual).toBe(11000);
   });
 
   it('cycles every level when price oscillates', () => {

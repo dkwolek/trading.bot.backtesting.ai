@@ -56,6 +56,17 @@ export function useChartInit(): ChartRefs {
         // renders the raw price independently of priceFormatter.
         horzLine: { labelVisible: false, labelBackgroundColor: '#22222e' },
       },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        axisPressedMouseMove: { time: true, price: true },
+        mouseWheel: true,
+        pinch: true,
+      },
       height: 350,
     });
 

@@ -23,6 +23,11 @@ export interface Signal {
   // at — used so the chart can label `TP2300` even though the sell price
   // is `2300 + step`.
   referencePrice?: number;
+  // Quote currency spent on the buy (incl. maker fee). Auto-grid in
+  // monthly mode uses a per-cycle amountPerLevel that drifts as the
+  // grid rebuilds, so the trade's true cost can't be re-derived from
+  // initialAmount alone. Other algos can leave this undefined.
+  cost?: number;
 }
 
 export interface LevelFill {
@@ -41,6 +46,10 @@ export interface Trade {
   pnlPercent: number;
   quantity: number;
   levels: LevelFill[];
+  // Total quote spent across this trade's entries — propagated from
+  // the algorithm's Buy signals when available. Drives the per-trade
+  // "investment" column in the trades table.
+  cost?: number;
 }
 
 export interface BacktestMetrics {
