@@ -7,6 +7,7 @@ import {
   resolveMonthlyMode,
   resolveMonthlyRangePct,
   resolveStepPrice,
+  resolveWeightedSizing,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
 import { simulateDCA } from '../../algos/dca.algo';
@@ -128,6 +129,7 @@ export default function AutoGridMetricsPanel() {
   const monthlyAmount = resolveMonthlyAmount(algoOptions);
   const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
   const dcaAllocationPct = resolveDcaAllocationPct(algoOptions);
+  const weightedSizing = resolveWeightedSizing(algoOptions);
 
   const dca = useMemo(
     () => simulateDCA(candles, initialAmount, monthlyMode ? monthlyAmount : 0),
@@ -144,6 +146,7 @@ export default function AutoGridMetricsPanel() {
         monthlyAmount,
         monthlyRangePct,
         dcaAllocationPct,
+        weightedSizing,
       }),
     [
       candles,
@@ -154,6 +157,7 @@ export default function AutoGridMetricsPanel() {
       monthlyAmount,
       monthlyRangePct,
       dcaAllocationPct,
+      weightedSizing,
     ]
   );
 

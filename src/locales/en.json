@@ -33,6 +33,7 @@
     "monthlyAmount": "Monthly amount $",
     "monthlyRange": "Grid range below price %",
     "dcaAllocation": "DCA allocation %",
+    "weightedSizing": "Weighted sizing (histogram of past visits)",
     "pendingBuys": "Pending buys",
     "maxTotalSlots": "Max total slots",
     "maxGridDepth": "Max grid depth",
