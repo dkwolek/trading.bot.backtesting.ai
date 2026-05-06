@@ -55,25 +55,25 @@ export default function Chart({ pair, candles, trades }: Props) {
   useMartingaleOverlay(chartRef, seriesRef, candles, autoGridStep, trades);
   const crosshairLabelRef = useCrosshairLabel(chartRef, seriesRef);
 
-  // Zoom in / out by shrinking or expanding the visible logical range
-  // by 30% around the current center. Lightweight-charts' time scale
-  // doesn't expose a "zoom by factor" so we read the current range
-  // and re-set it manually. Reset goes back to fit-content.
+  // Drive zoom via barSpacing (px / bar) instead of setVisibleLogicalRange.
+  // lightweight-charts caps the visible logical range at ~1 bar minimum,
+  // so even with an aggressive shrink factor the zoom hits an invisible
+  // wall when each click should still be bringing more pixels per bar.
+  // factor < 1 = zoom in (more px / bar), factor > 1 = zoom out.
+  // Bounds: min 0.1 px / bar (very zoomed out), max 200 px / bar
+  // (each candle takes a chunk of screen — beyond this it's a wall too).
+  const MIN_BAR_SPACING = 0.1;
+  const MAX_BAR_SPACING = 200;
   function zoomBy(factor: number) {
     const chart = chartRef.current;
     if (!chart) {
       return;
     }
-    const range = chart.timeScale().getVisibleLogicalRange();
-    if (!range) {
-      return;
-    }
-    const center = (range.from + range.to) / 2;
-    const halfSpan = ((range.to - range.from) / 2) * factor;
-    chart.timeScale().setVisibleLogicalRange({
-      from: center - halfSpan,
-      to: center + halfSpan,
-    });
+    const timeScale = chart.timeScale();
+    const currentSpacing = timeScale.options().barSpacing ?? 6;
+    const desired = currentSpacing / factor;
+    const clamped = Math.min(MAX_BAR_SPACING, Math.max(MIN_BAR_SPACING, desired));
+    timeScale.applyOptions({ barSpacing: clamped });
   }
 
   function resetZoom() {
