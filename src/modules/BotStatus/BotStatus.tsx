@@ -45,10 +45,10 @@ export default function BotStatus() {
         <StatusPanel
           lines={data.lines}
           logFile={data.logFile}
+          logFileMtime={data.logFileMtime}
           fetchedAt={data.fetchedAt}
           state={data.state}
           stateError={data.stateError}
-          config={data.config}
         />
       ) : (
         <div className="bg-surface border border-border p-6 text-[12px] font-mono text-muted">

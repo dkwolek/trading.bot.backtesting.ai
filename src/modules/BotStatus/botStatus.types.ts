@@ -21,20 +21,26 @@ export interface RemoteSlot {
 export interface RemoteState {
   slots: RemoteSlot[];
   gridAnchor: number | null;
+  amountPerLevel: number;
+  lastTotalQuote: number;
+  makerFee: number;
   totalRealized: number;
   totalFees: number;
   cycles: number;
 }
 
 export interface RemoteConfig {
-  amountPerLevel: number | null;
+  pair: string | null;
   stepPrice: number | null;
-  maxTotalSlots: number | null;
+  gridRangePct: number | null;
+  pendingBuys: number | null;
+  pollIntervalMs: number | null;
 }
 
 export interface BotStatusResponse {
   ok: true;
   logFile: string;
+  logFileMtime: number | null;
   lines: string[];
   state: RemoteState | null;
   stateError: string | null;
@@ -78,6 +84,10 @@ export interface LogCounters {
   errors: number;
   warnings: number;
   shifts: number;
+  deposits: number;
+  withdrawals: number;
+  heartbeats: number;
+  recomputes: number;
 }
 
 export interface BotStatusForm {

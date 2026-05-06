@@ -24,20 +24,26 @@ interface RemoteSlot {
 interface RemoteState {
   slots: RemoteSlot[];
   gridAnchor: number | null;
+  amountPerLevel: number;
+  lastTotalQuote: number;
+  makerFee: number;
   totalRealized: number;
   totalFees: number;
   cycles: number;
 }
 
 interface RemoteConfig {
-  amountPerLevel: number | null;
+  pair: string | null;
   stepPrice: number | null;
-  maxTotalSlots: number | null;
+  gridRangePct: number | null;
+  pendingBuys: number | null;
+  pollIntervalMs: number | null;
 }
 
 interface SuccessResponse {
   ok: true;
   logFile: string;
+  logFileMtime: number | null;
   lines: string[];
   state: RemoteState | null;
   stateError: string | null;
@@ -109,6 +115,9 @@ function parseRemoteState(raw: string): RemoteState | null {
   return {
     slots: Array.isArray(parsed.slots) ? parsed.slots : [],
     gridAnchor: typeof parsed.gridAnchor === 'number' ? parsed.gridAnchor : null,
+    amountPerLevel: typeof parsed.amountPerLevel === 'number' ? parsed.amountPerLevel : 0,
+    lastTotalQuote: typeof parsed.lastTotalQuote === 'number' ? parsed.lastTotalQuote : 0,
+    makerFee: typeof parsed.makerFee === 'number' ? parsed.makerFee : 0,
     totalRealized: typeof parsed.totalRealized === 'number' ? parsed.totalRealized : 0,
     totalFees: typeof parsed.totalFees === 'number' ? parsed.totalFees : 0,
     cycles: typeof parsed.cycles === 'number' ? parsed.cycles : 0,
@@ -121,9 +130,11 @@ function parseRemoteConfig(raw: string): RemoteConfig | null {
   }
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   return {
-    amountPerLevel: typeof parsed.amountPerLevel === 'number' ? parsed.amountPerLevel : null,
+    pair: typeof parsed.pair === 'string' ? parsed.pair : null,
     stepPrice: typeof parsed.stepPrice === 'number' ? parsed.stepPrice : null,
-    maxTotalSlots: typeof parsed.maxTotalSlots === 'number' ? parsed.maxTotalSlots : null,
+    gridRangePct: typeof parsed.gridRangePct === 'number' ? parsed.gridRangePct : null,
+    pendingBuys: typeof parsed.pendingBuys === 'number' ? parsed.pendingBuys : null,
+    pollIntervalMs: typeof parsed.pollIntervalMs === 'number' ? parsed.pollIntervalMs : null,
   };
 }
 
@@ -150,6 +161,20 @@ async function fetchSnapshot(body: RequestBody): Promise<SuccessResponse> {
     const latestPath = (await execOverSsh(client, latestCmd)).trim();
     if (!latestPath) {
       throw new Error(`No log files found in ${body.logDir}`);
+    }
+    // Read mtime alongside content so the UI can flag a stale file
+    // (bot crashed / not actually writing) without the user having to
+    // squint at timestamps inside the log itself.
+    const mtimeCmd = `stat -c %Y '${shellEscape(latestPath)}' 2>/dev/null || stat -f %m '${shellEscape(latestPath)}'`;
+    let logFileMtime: number | null = null;
+    try {
+      const mtimeRaw = (await execOverSsh(client, mtimeCmd)).trim();
+      const epoch = Number(mtimeRaw);
+      if (Number.isFinite(epoch) && epoch > 0) {
+        logFileMtime = epoch * 1000;
+      }
+    } catch {
+      // not fatal — UI just won't show file age
     }
     const tailCmd = `tail -n ${tailLines} '${shellEscape(latestPath)}'`;
     const content = await execOverSsh(client, tailCmd);
@@ -186,6 +211,7 @@ async function fetchSnapshot(body: RequestBody): Promise<SuccessResponse> {
     return {
       ok: true,
       logFile: latestPath,
+      logFileMtime,
       lines,
       state,
       stateError,

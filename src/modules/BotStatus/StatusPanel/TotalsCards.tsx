@@ -1,9 +1,8 @@
 import t from '../../../locales';
-import { RemoteConfig, RemoteState } from '../botStatus.types';
+import { RemoteState } from '../botStatus.types';
 
 interface Props {
   state: RemoteState;
-  config: RemoteConfig | null;
 }
 
 function formatDollars(value: number, fractionDigits = 2): string {
@@ -33,11 +32,13 @@ function pnlClass(value: number): string {
 // (cycles + currently-owned slots) × amountPerLevel. ROI uses this as
 // the denominator so the % reflects "return on every dollar I've put
 // into the grid", not "return on what's still locked right now".
-// Returns null when amountPerLevel can't be resolved (config.json
-// unreachable AND no owned slot to peek the cost off).
-function resolveAmountPerLevel(state: RemoteState, config: RemoteConfig | null): number | null {
-  if (config?.amountPerLevel && config.amountPerLevel > 0) {
-    return config.amountPerLevel;
+// state.amountPerLevel is the live snapshot the bot itself uses for
+// new placements; it's recomputed only on rebuild events (init /
+// shift-up with empty bag / detected deposit). Falls back to peeking
+// at an owned slot's cost when state pre-dates this field.
+function resolveAmountPerLevel(state: RemoteState): number | null {
+  if (state.amountPerLevel > 0) {
+    return state.amountPerLevel;
   }
   const ownedWithCost = state.slots.find(
     (slot) => slot.state === 'owned' && slot.cost && slot.cost > 0
@@ -45,8 +46,8 @@ function resolveAmountPerLevel(state: RemoteState, config: RemoteConfig | null):
   return ownedWithCost?.cost ?? null;
 }
 
-export default function TotalsCards({ state, config }: Props) {
-  const amountPerLevel = resolveAmountPerLevel(state, config);
+export default function TotalsCards({ state }: Props) {
+  const amountPerLevel = resolveAmountPerLevel(state);
   const totalDeployedEver =
     amountPerLevel === null ? null : (state.cycles + state.slots.length) * amountPerLevel;
   const roi =
