@@ -24,5 +24,9 @@ export interface ControlDef {
   options?: AlgoParamOption[];
   group?: string;
   disablable?: boolean;
-  disabledWhen?: { key: string; value: AlgoOptionValue };
+  // Single condition disables the control when `options[key] === value`.
+  // Array of conditions: any one matching disables (logical OR).
+  disabledWhen?:
+    | { key: string; value: AlgoOptionValue }
+    | { key: string; value: AlgoOptionValue }[];
 }

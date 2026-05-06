@@ -40,7 +40,14 @@ export const controls: ControlDef[] = [
     max: 1000,
     step: 5,
     group: 'Levels',
-    disabledWhen: { key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY, value: true },
+    // Both autoSize (initialAmount / numLevelsAtStart) and monthlyMode
+    // (freeCapital / numLevelsAtMonthBoundary) override amountPerLevel
+    // dynamically — leaving the slider live in either mode would
+    // mislead the user about what's actually being spent per buy.
+    disabledWhen: [
+      { key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY, value: true },
+      { key: AUTO_GRID_MONTHLY_MODE_KEY, value: true },
+    ],
   },
   {
     key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY,

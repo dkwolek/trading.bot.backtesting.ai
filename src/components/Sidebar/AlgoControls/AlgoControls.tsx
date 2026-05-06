@@ -21,9 +21,12 @@ function renderControl(
     const enabled = param.disablable
       ? ((options[enabledKey(param.key)] as boolean | undefined) ?? true)
       : undefined;
-    const disabled = param.disabledWhen
-      ? options[param.disabledWhen.key] === param.disabledWhen.value
-      : false;
+    const conditions = Array.isArray(param.disabledWhen)
+      ? param.disabledWhen
+      : param.disabledWhen
+        ? [param.disabledWhen]
+        : [];
+    const disabled = conditions.some((condition) => options[condition.key] === condition.value);
     return (
       <Slider
         key={param.key}
