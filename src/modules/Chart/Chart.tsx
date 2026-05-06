@@ -62,7 +62,7 @@ export default function Chart({ pair, candles, trades }: Props) {
   // factor < 1 = zoom in (more px / bar), factor > 1 = zoom out.
   // Bounds: min 0.1 px / bar (very zoomed out), max 200 px / bar
   // (each candle takes a chunk of screen — beyond this it's a wall too).
-  const MIN_BAR_SPACING = 0.1;
+  const MIN_BAR_SPACING = 0.001;
   const MAX_BAR_SPACING = 200;
   function zoomBy(factor: number) {
     const chart = chartRef.current;

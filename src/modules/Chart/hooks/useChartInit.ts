@@ -46,6 +46,10 @@ export function useChartInit(): ChartRefs {
         secondsVisible: false,
         fixLeftEdge: true,
         tickMarkFormatter: formatCetTickMark,
+        // Default 0.5 px/bar caps the zoom-out at ~2 bars/pixel; drop
+        // it so the user can zoom out to "show the whole year on one
+        // screen" via repeated wheel/button presses.
+        minBarSpacing: 0.001,
       },
       crosshair: {
         mode: CrosshairMode.Normal,
