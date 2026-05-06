@@ -4,7 +4,6 @@ import ChartLineIcon from '../../components/Icons/ChartLineIcon';
 import t from '../../locales';
 import {
   resolveAmountPerLevel,
-  resolveAutoSizeAmount,
   resolveDcaAllocationPct,
   resolveMonthlyAmount,
   resolveMonthlyMode,
@@ -23,7 +22,6 @@ export default function StrategyChart({ candles }: Props) {
   const { initialAmount, algoOptions } = useTradingContext();
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
-  const autoSizeAmount = resolveAutoSizeAmount(algoOptions);
   const monthlyMode = resolveMonthlyMode(algoOptions);
   const monthlyAmount = resolveMonthlyAmount(algoOptions);
   const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
@@ -36,7 +34,6 @@ export default function StrategyChart({ candles }: Props) {
     const primary = simulateAutoGrid(candles, {
       stepPrice,
       amountPerLevel,
-      autoSizeAmount,
       initialAmount,
       monthlyMode,
       monthlyAmount,
@@ -48,7 +45,6 @@ export default function StrategyChart({ candles }: Props) {
     candles,
     stepPrice,
     amountPerLevel,
-    autoSizeAmount,
     initialAmount,
     monthlyMode,
     monthlyAmount,

@@ -29,7 +29,6 @@
   "autoGridControls": {
     "stepPrice": "Level Step $",
     "amountPerLevel": "Amount per level $",
-    "autoSizeAmount": "Auto-size amount (use full initial amount)",
     "monthlyMode": "Monthly contribution mode",
     "monthlyAmount": "Monthly amount $",
     "monthlyRange": "Grid range below price %",

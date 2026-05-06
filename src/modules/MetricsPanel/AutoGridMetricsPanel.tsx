@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useTradingContext } from '../../context/TradingContext';
 import {
   resolveAmountPerLevel,
-  resolveAutoSizeAmount,
   resolveDcaAllocationPct,
   resolveMonthlyAmount,
   resolveMonthlyMode,
@@ -125,7 +124,6 @@ export default function AutoGridMetricsPanel() {
   const { algoOptions, candles, initialAmount } = useTradingContext();
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
-  const autoSizeAmount = resolveAutoSizeAmount(algoOptions);
   const monthlyMode = resolveMonthlyMode(algoOptions);
   const monthlyAmount = resolveMonthlyAmount(algoOptions);
   const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
@@ -141,7 +139,6 @@ export default function AutoGridMetricsPanel() {
       simulateAutoGrid(candles, {
         stepPrice,
         amountPerLevel,
-        autoSizeAmount,
         initialAmount,
         monthlyMode,
         monthlyAmount,
@@ -152,7 +149,6 @@ export default function AutoGridMetricsPanel() {
       candles,
       stepPrice,
       amountPerLevel,
-      autoSizeAmount,
       initialAmount,
       monthlyMode,
       monthlyAmount,

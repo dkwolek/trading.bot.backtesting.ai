@@ -6,7 +6,6 @@ import { Candle } from '../types/global.types';
 
 const DEFAULT_STEP_PRICE = 25;
 const DEFAULT_AMOUNT_PER_LEVEL = 10;
-const DEFAULT_AUTO_SIZE_AMOUNT = false;
 const DEFAULT_MONTHLY_MODE = false;
 const DEFAULT_MONTHLY_AMOUNT = 1000;
 const DEFAULT_MONTHLY_RANGE_PCT = 50;
@@ -14,7 +13,6 @@ const DEFAULT_DCA_ALLOCATION_PCT = 0;
 
 export const AUTO_GRID_STEP_PRICE_KEY = 'autoGridStepPrice';
 export const AUTO_GRID_AMOUNT_PER_LEVEL_KEY = 'autoGridAmountPerLevel';
-export const AUTO_GRID_AUTO_SIZE_AMOUNT_KEY = 'autoGridAutoSizeAmount';
 export const AUTO_GRID_MONTHLY_MODE_KEY = 'autoGridMonthlyMode';
 export const AUTO_GRID_MONTHLY_AMOUNT_KEY = 'autoGridMonthlyAmount';
 export const AUTO_GRID_MONTHLY_RANGE_KEY = 'autoGridMonthlyRange';
@@ -40,21 +38,9 @@ export const controls: ControlDef[] = [
     max: 1000,
     step: 5,
     group: 'Levels',
-    // Both autoSize (initialAmount / numLevelsAtStart) and monthlyMode
-    // (freeCapital / numLevelsAtMonthBoundary) override amountPerLevel
-    // dynamically — leaving the slider live in either mode would
-    // mislead the user about what's actually being spent per buy.
-    disabledWhen: [
-      { key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY, value: true },
-      { key: AUTO_GRID_MONTHLY_MODE_KEY, value: true },
-    ],
-  },
-  {
-    key: AUTO_GRID_AUTO_SIZE_AMOUNT_KEY,
-    title: t.autoGridControls.autoSizeAmount,
-    type: 'checkbox',
-    defaultValue: DEFAULT_AUTO_SIZE_AMOUNT,
-    group: 'Levels',
+    // monthlyMode overrides amountPerLevel dynamically
+    // (freeCapital / numLevelsAtMonthBoundary) — leaving the slider
+    // live in monthly mode would mislead about what's actually spent.
     disabledWhen: { key: AUTO_GRID_MONTHLY_MODE_KEY, value: true },
   },
   {
@@ -108,11 +94,6 @@ export function resolveAmountPerLevel(options: AlgoOptions): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : DEFAULT_AMOUNT_PER_LEVEL;
-}
-
-export function resolveAutoSizeAmount(options: AlgoOptions): boolean {
-  const value = options[AUTO_GRID_AUTO_SIZE_AMOUNT_KEY];
-  return typeof value === 'boolean' ? value : DEFAULT_AUTO_SIZE_AMOUNT;
 }
 
 export function resolveMonthlyMode(options: AlgoOptions): boolean {
@@ -261,14 +242,6 @@ export function computeMaxDropInfo(candles: Candle[], stepPrice: number): MaxDro
 export interface BotSimConfig {
   stepPrice: number;
   amountPerLevel: number;
-  // When true, amountPerLevel auto-derives from
-  // `initialAmount / floor(sessionAnchor / stepPrice)`. Anchor starts
-  // at the first candle's close and bumps up whenever a chase entry
-  // opens at a price above the current anchor — each anchor bump
-  // shrinks `amountPerLevel` so deployed capital scales with how
-  // many levels the grid currently covers. Mutually exclusive with
-  // monthly mode.
-  autoSizeAmount?: boolean;
   initialAmount?: number;
   // Monthly contribution mode: every calendar month the bot adds
   // `monthlyAmount` to free capital, cancels pending grid orders
@@ -276,7 +249,7 @@ export interface BotSimConfig {
   // [currentPrice × (1 − monthlyRangePct/100), currentPrice].
   // amountPerLevel = freeCapital / numLevels at rebuild time.
   // Owned bag positions are preserved across resets and cleared
-  // only by their own TP. Mutually exclusive with autoSizeAmount.
+  // only by their own TP.
   monthlyMode?: boolean;
   monthlyAmount?: number;
   monthlyRangePct?: number;
@@ -290,7 +263,6 @@ export interface BotSimConfig {
 }
 
 export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoGridSimulation {
-  const autoSizeAmount = config.autoSizeAmount ?? false;
   const initialAmount = config.initialAmount ?? 0;
   const monthlyMode = config.monthlyMode ?? false;
   const monthlyAmount = Math.max(0, config.monthlyAmount ?? DEFAULT_MONTHLY_AMOUNT);
@@ -333,14 +305,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   const owned = new Map<number, OwnedSlot>();
   let totalProfit = 0;
   let amountPerLevel = config.amountPerLevel;
-
-  // Auto-size: amountPerLevel auto-derives from
-  // `initialAmount / floor(sessionAnchor / stepPrice)`.
-  let sessionAnchorIndex = 0;
-  if (autoSizeAmount && !monthlyMode && initialAmount > 0) {
-    sessionAnchorIndex = Math.max(1, Math.floor(candles[0].close / stepPrice));
-    amountPerLevel = initialAmount / sessionAnchorIndex;
-  }
 
   // Monthly mode bookkeeping.
   let freeCapital = initialAmount;
@@ -413,15 +377,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
           if (!owned.has(tpIndex)) {
             const enoughCapital = !monthlyMode || freeCapital >= amountPerLevel;
             if (enoughCapital) {
-              if (
-                autoSizeAmount &&
-                !monthlyMode &&
-                initialAmount > 0 &&
-                tpIndex > sessionAnchorIndex
-              ) {
-                sessionAnchorIndex = tpIndex;
-                amountPerLevel = initialAmount / sessionAnchorIndex;
-              }
               const chaseLevelPrice = tpIndex * stepPrice;
               const volume = (amountPerLevel * (1 - TRADE_FEE)) / chaseLevelPrice;
               owned.set(tpIndex, {
@@ -479,7 +434,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
         );
         const numLevels = Math.max(1, monthlyCeilingIndex - monthlyFloorIndex);
         amountPerLevel = freeCapital / numLevels;
-        sessionAnchorIndex = monthlyCeilingIndex;
         lastMonthKey = monthKey;
       }
     }
@@ -572,15 +526,9 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   // Required capital denominator:
   // - monthly mode: total cumulative deposits (the only meaningful
   //   denominator since capital arrives over time)
-  // - auto-size: initialAmount (budget IS the capital by construction)
   // - default: peak concurrent owned (matches user expectation that
   //   "required capital = worst-moment locked")
-  let requiredCapitalActual = maxCapital;
-  if (monthlyMode) {
-    requiredCapitalActual = totalDeposited;
-  } else if (autoSizeAmount && initialAmount > 0) {
-    requiredCapitalActual = initialAmount;
-  }
+  const requiredCapitalActual = monthlyMode ? totalDeposited : maxCapital;
 
   return {
     totalProfit,
@@ -619,7 +567,6 @@ export function run(candles: Candle[], options: AlgoOptions): Signal[] {
   const result = simulateAutoGrid(candles, {
     stepPrice: resolveStepPrice(options),
     amountPerLevel: resolveAmountPerLevel(options),
-    autoSizeAmount: resolveAutoSizeAmount(options),
     initialAmount: resolveInjectedInitialAmount(options),
     monthlyMode: resolveMonthlyMode(options),
     monthlyAmount: resolveMonthlyAmount(options),

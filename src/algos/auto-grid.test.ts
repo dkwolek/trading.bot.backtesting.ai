@@ -49,45 +49,6 @@ describe('simulateAutoGrid', () => {
     expect(result.lockedLevels[0].level).toBe(200);
   });
 
-  it('auto-size derives amountPerLevel from initialAmount and the session anchor', () => {
-    // Anchor at $2000 with step $25 → 80 levels, amount = 10000/80 = $125.
-    // No price action, so the anchor never moves and amount stays at $125
-    // for the (one) fill that the seed candle produces.
-    const seed = makeCandle(1700000000, 2000, 2000, 2000, 2000);
-    const result = simulateAutoGrid([seed], {
-      stepPrice: 25,
-      amountPerLevel: 999, // ignored when autoSizeAmount is on
-      autoSizeAmount: true,
-      initialAmount: 10000,
-    });
-    expect(result.openPositionsAtEnd).toBe(1);
-    expect(result.openPositionsCost).toBeCloseTo(125, 2);
-  });
-
-  it('auto-size shrinks amountPerLevel as the chase pushes the anchor up', () => {
-    // Seed at $2000 fills L80. A wide candle reaching $2100 should
-    // cascade chase L80→L81→L82→L83→L84. Each upward chase bumps the
-    // session anchor and shrinks the per-level amount: $2000→$125,
-    // $2025→$123.46, $2050→$121.95, $2075→$120.48, $2100→$119.05. The
-    // final owned slot at L84 carries the smallest amount.
-    const seed = makeCandle(1700000000, 2000, 2000, 2000, 2000);
-    const climb = makeCandle(1700000060, 2025, 2100, 2025, 2100);
-    const candles = [seed, climb];
-
-    const result = simulateAutoGrid(candles, {
-      stepPrice: 25,
-      amountPerLevel: 999,
-      autoSizeAmount: true,
-      initialAmount: 10000,
-    });
-    expect(result.completedCycles).toBeGreaterThan(0);
-    expect(result.openPositionsAtEnd).toBe(1);
-    const lastSlot = result.lockedLevels[0];
-    expect(lastSlot.level).toBe(2100);
-    // Final entry uses the smallest amount: 10000 / 84.
-    expect(result.openPositionsCost).toBeCloseTo(10000 / 84, 2);
-  });
-
   it('monthly mode tops up freeCapital and rebuilds the grid each calendar month', () => {
     // Two calendar months at price 2000 (no price movement) — first
     // candle: initial deposit ($10k) seeds month 1 grid. First candle
