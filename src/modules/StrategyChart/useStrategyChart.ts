@@ -78,7 +78,7 @@ export function useStrategyChart(
         vertLine: { labelVisible: true, labelBackgroundColor: '#22222e' },
         horzLine: { labelVisible: true, labelBackgroundColor: '#22222e' },
       },
-      height: 10,
+      height: 140,
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
