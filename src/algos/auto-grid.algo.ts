@@ -174,6 +174,13 @@ export interface AutoGridSimulation {
   requiredCapitalActual: number;
   totalDeposited: number; // initialAmount + monthly contributions
   monthlyResets: number; // count of new-month grid resets
+  // Time-weighted average of bag_cost / capital_available_so_far,
+  // expressed as a percentage. Tells the user how much of their
+  // money was actually working in the grid on average across the
+  // simulation. Low values (e.g. <30%) mean the monthly amount
+  // overshoots what the grid can absorb in the given price action,
+  // and the excess sits idle, dragging down Net %.
+  avgDeploymentPct: number;
   // Hybrid DCA portion. dcaCost = total $ spent on the hodl bag
   // (initial + monthly slices). dcaValue = current mark-to-market
   // value at the dataset's last close. dcaPnl = value − cost.
@@ -355,6 +362,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       requiredCapitalActual: 0,
       totalDeposited: initialAmount,
       monthlyResets: 0,
+      avgDeploymentPct: 0,
       dcaCost: 0,
       dcaValue: 0,
       dcaPnl: 0,
@@ -382,6 +390,14 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   let freeCapital = initialAmount;
   let totalDeposited = initialAmount;
   let monthlyResets = 0;
+  // Running sums for the time-weighted deployment ratio. Each candle
+  // contributes (bag cost) / (deposited so far) → ratio averaged at
+  // the end. Early in monthly mode `totalDeposited` is small, so a
+  // few candles where the bag is full pull the average up regardless
+  // of later idle months — that's intentional, the metric reflects
+  // actual capital efficiency over the lifetime.
+  let sumBagCostOverTime = 0;
+  let sumDepositedOverTime = 0;
   let lastMonthKey = -1;
   let monthlyFloorIndex = 0;
   let monthlyCeilingIndex = 0;
@@ -586,6 +602,10 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     if (capitalDeployed > maxCapital) {
       maxCapital = capitalDeployed;
     }
+    if (totalDeposited > 0) {
+      sumBagCostOverTime += capitalDeployed;
+      sumDepositedOverTime += totalDeposited;
+    }
 
     prevCloseIndex = Math.floor(candle.close / stepPrice);
   }
@@ -624,6 +644,8 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   // - default: peak concurrent owned (matches user expectation that
   //   "required capital = worst-moment locked")
   const requiredCapitalActual = monthlyMode ? totalDeposited : maxCapital;
+  const avgDeploymentPct =
+    sumDepositedOverTime > 0 ? (sumBagCostOverTime / sumDepositedOverTime) * 100 : 0;
 
   return {
     totalProfit,
@@ -642,6 +664,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     requiredCapitalActual,
     totalDeposited,
     monthlyResets,
+    avgDeploymentPct,
     dcaCost,
     dcaValue,
     dcaPnl,

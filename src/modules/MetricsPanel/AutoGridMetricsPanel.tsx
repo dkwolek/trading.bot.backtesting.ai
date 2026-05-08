@@ -179,7 +179,19 @@ export default function AutoGridMetricsPanel() {
     ? `monthly · ${simulation.monthlyResets} resets`
     : `peak concurrent · ${simulation.uniqueLevelsTraded} unique levels`;
   const hybridActive = monthlyMode && dcaAllocationPct > 0;
-  const showColumns = hybridActive ? 'grid-cols-6' : 'grid-cols-5';
+  const showColumns = hybridActive ? 'grid-cols-7' : 'grid-cols-6';
+  const deploymentPct = simulation.avgDeploymentPct;
+  // Visual cue: >70% means the grid is consuming most of what gets
+  // deposited; <40% flags wasted budget that's just sitting idle and
+  // dragging Net % down. The user can use this to size monthlyAmount.
+  let deploymentClass = 'text-text';
+  if (deploymentPct >= 70) {
+    deploymentClass = 'text-green';
+  } else if (deploymentPct < 40) {
+    deploymentClass = 'text-yellow-400';
+  }
+  const deploymentHint =
+    deploymentPct >= 70 ? 'capital working' : deploymentPct >= 40 ? 'partial use' : 'mostly idle';
 
   return (
     <div className={`grid ${showColumns} gap-2`}>
@@ -231,6 +243,13 @@ export default function AutoGridMetricsPanel() {
         secondaryLabel={requiredLabel}
         secondaryValue={`Open ${formatDollars(simulation.openPositionsCost)}`}
         secondaryClass={simulation.openPositionsCost > 0 ? 'text-yellow-400' : 'text-text'}
+      />
+      <DualMetricCard
+        primaryLabel="Deployment"
+        primaryValue={`${deploymentPct.toFixed(1)}%`}
+        primaryClass={deploymentClass}
+        secondaryLabel={deploymentHint}
+        secondaryValue={`peak ${formatDollars(simulation.maxCapitalDeployed)}`}
       />
       <DualMetricCard
         primaryLabel="Cycles"
