@@ -180,16 +180,6 @@ export default function AutoGridMetricsPanel() {
     : `peak concurrent · ${simulation.uniqueLevelsTraded} unique levels`;
   const hybridActive = monthlyMode && dcaAllocationPct > 0;
   const showColumns = hybridActive ? 'grid-cols-6' : 'grid-cols-5';
-  const deploymentPct = simulation.avgDeploymentPct;
-  // Visual cue: >70% means the grid is consuming most of what gets
-  // deposited; <40% flags wasted budget that's just sitting idle and
-  // dragging Net % down. The user can use this to size monthlyAmount.
-  let deploymentClass = 'text-text';
-  if (deploymentPct >= 70) {
-    deploymentClass = 'text-green';
-  } else if (deploymentPct < 40) {
-    deploymentClass = 'text-yellow-400';
-  }
 
   return (
     <div className={`grid ${showColumns} gap-2`}>
@@ -236,9 +226,8 @@ export default function AutoGridMetricsPanel() {
         </div>
       </div>
       <DualMetricCard
-        primaryLabel={`Required capital · ${deploymentPct.toFixed(0)}% deployed`}
+        primaryLabel="Required capital"
         primaryValue={formatDollars(requiredCapital)}
-        primaryClass={deploymentClass}
         secondaryLabel={requiredLabel}
         secondaryValue={`Open ${formatDollars(simulation.openPositionsCost)}`}
         secondaryClass={simulation.openPositionsCost > 0 ? 'text-yellow-400' : 'text-text'}
