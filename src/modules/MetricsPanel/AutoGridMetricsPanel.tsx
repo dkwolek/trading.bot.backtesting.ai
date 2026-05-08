@@ -236,11 +236,12 @@ export default function AutoGridMetricsPanel() {
         </div>
       </div>
       <DualMetricCard
-        primaryLabel="Required capital"
+        primaryLabel={`Required capital · ${deploymentPct.toFixed(0)}% deployed`}
         primaryValue={formatDollars(requiredCapital)}
-        secondaryLabel={`${deploymentPct.toFixed(1)}% deployed · ${requiredLabel}`}
-        secondaryValue={`peak ${formatDollars(simulation.maxCapitalDeployed)} · open ${formatDollars(simulation.openPositionsCost)}`}
-        secondaryClass={deploymentClass}
+        primaryClass={deploymentClass}
+        secondaryLabel={requiredLabel}
+        secondaryValue={`Open ${formatDollars(simulation.openPositionsCost)}`}
+        secondaryClass={simulation.openPositionsCost > 0 ? 'text-yellow-400' : 'text-text'}
       />
       <DualMetricCard
         primaryLabel="Cycles"
