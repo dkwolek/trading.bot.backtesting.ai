@@ -9,7 +9,6 @@ import {
   resolveMonthlyMode,
   resolveMonthlyRangePct,
   resolveStepPrice,
-  resolveWeightedSizing,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
 import { Candle } from '../../types/global.types';
@@ -27,7 +26,6 @@ export default function StrategyChart({ candles }: Props) {
   const monthlyAmount = resolveMonthlyAmount(algoOptions);
   const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
   const dcaAllocationPct = resolveDcaAllocationPct(algoOptions);
-  const weightedSizing = resolveWeightedSizing(algoOptions);
 
   const histories = useMemo(() => {
     if (!candles || candles.length === 0) {
@@ -41,7 +39,6 @@ export default function StrategyChart({ candles }: Props) {
       monthlyAmount,
       monthlyRangePct,
       dcaAllocationPct,
-      weightedSizing,
     }).realizedHistory;
     return { primary, comparison: null };
   }, [
@@ -53,7 +50,6 @@ export default function StrategyChart({ candles }: Props) {
     monthlyAmount,
     monthlyRangePct,
     dcaAllocationPct,
-    weightedSizing,
   ]);
 
   const { chartPaneRef, hasCandles } = useStrategyChart(

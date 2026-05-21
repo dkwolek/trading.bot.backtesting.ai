@@ -10,15 +10,12 @@ const DEFAULT_MONTHLY_MODE = false;
 const DEFAULT_MONTHLY_AMOUNT = 1000;
 const DEFAULT_MONTHLY_RANGE_PCT = 50;
 const DEFAULT_DCA_ALLOCATION_PCT = 0;
-const DEFAULT_WEIGHTED_SIZING = false;
-
 export const AUTO_GRID_STEP_PRICE_KEY = 'autoGridStepPrice';
 export const AUTO_GRID_AMOUNT_PER_LEVEL_KEY = 'autoGridAmountPerLevel';
 export const AUTO_GRID_MONTHLY_MODE_KEY = 'autoGridMonthlyMode';
 export const AUTO_GRID_MONTHLY_AMOUNT_KEY = 'autoGridMonthlyAmount';
 export const AUTO_GRID_MONTHLY_RANGE_KEY = 'autoGridMonthlyRange';
 export const AUTO_GRID_DCA_ALLOCATION_KEY = 'autoGridDcaAllocation';
-export const AUTO_GRID_WEIGHTED_SIZING_KEY = 'autoGridWeightedSizing';
 
 export const controls: ControlDef[] = [
   {
@@ -82,13 +79,6 @@ export const controls: ControlDef[] = [
     step: 5,
     group: 'Monthly',
   },
-  {
-    key: AUTO_GRID_WEIGHTED_SIZING_KEY,
-    title: t.autoGridControls.weightedSizing,
-    type: 'checkbox',
-    defaultValue: DEFAULT_WEIGHTED_SIZING,
-    group: 'Monthly',
-  },
 ];
 
 export function resolveStepPrice(options: AlgoOptions): number {
@@ -132,11 +122,6 @@ export function resolveDcaAllocationPct(options: AlgoOptions): number {
     return DEFAULT_DCA_ALLOCATION_PCT;
   }
   return value;
-}
-
-export function resolveWeightedSizing(options: AlgoOptions): boolean {
-  const value = options[AUTO_GRID_WEIGHTED_SIZING_KEY];
-  return typeof value === 'boolean' ? value : DEFAULT_WEIGHTED_SIZING;
 }
 
 export interface MaxDropInfo {
@@ -190,6 +175,7 @@ export interface AutoGridSimulation {
   // hybridNetPnl combines grid net PnL + DCA PnL — the actual money
   // the user makes when running the bot in mixed mode.
   hybridNetPnl: number;
+  finalFreeCash: number; // quote capital not tied up in any position at the end of the simulation
 }
 
 export interface RealizedSnapshot {
@@ -203,45 +189,6 @@ interface OwnedSlot {
   volume: number;
   cost: number;
   ownedAt: number;
-}
-
-// Range-based level visit counts: each candle is counted at every grid
-// level its [low, high] crosses. More accurate proxy for "would a limit
-// order at this level have filled" than close-only counts. Returns a
-// normalized weight map (sum = 1) restricted to [fromLevelIndex,
-// toLevelIndex] inclusive — levels with zero visits are omitted so the
-// caller can choose to skip them rather than place zero-cost orders.
-export function computeLevelWeights(
-  candles: Candle[],
-  stepPrice: number,
-  fromLevelIndex: number,
-  toLevelIndex: number
-): Map<number, number> {
-  if (candles.length === 0 || stepPrice <= 0 || toLevelIndex < fromLevelIndex) {
-    return new Map();
-  }
-  const counts = new Map<number, number>();
-  for (const candle of candles) {
-    const lowIdx = Math.ceil(candle.low / stepPrice);
-    const highIdx = Math.floor(candle.high / stepPrice);
-    const start = Math.max(lowIdx, fromLevelIndex);
-    const end = Math.min(highIdx, toLevelIndex);
-    for (let idx = start; idx <= end; idx++) {
-      counts.set(idx, (counts.get(idx) ?? 0) + 1);
-    }
-  }
-  let total = 0;
-  for (const count of counts.values()) {
-    total += count;
-  }
-  if (total === 0) {
-    return new Map();
-  }
-  const weights = new Map<number, number>();
-  for (const [idx, count] of counts) {
-    weights.set(idx, count / total);
-  }
-  return weights;
 }
 
 export function computeLevelOccupancy(candles: Candle[], stepPrice: number): LevelStat[] {
@@ -320,15 +267,6 @@ export interface BotSimConfig {
   // is added to the simulation's net PnL at the end. With dcaAllocation
   // = 0 the behaviour is unchanged; with 100 the bot is pure DCA.
   dcaAllocationPct?: number;
-  // Weighted sizing: instead of distributing freeCapital uniformly
-  // across the corridor, weight each level by its historical visit
-  // probability (range-based: count of past candles whose [low,high]
-  // crossed the level). High-traffic levels get more capital, dead
-  // levels get none. Only takes effect inside monthlyMode (uniform
-  // sizing depends on freeCapital / numLevels rebuild semantics).
-  // Anti-leak: weights are computed only from candles up to the
-  // current rebuild boundary, never from future data.
-  weightedSizing?: boolean;
 }
 
 export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoGridSimulation {
@@ -341,7 +279,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   );
   const dcaAllocationFraction =
     Math.max(0, Math.min(100, config.dcaAllocationPct ?? DEFAULT_DCA_ALLOCATION_PCT)) / 100;
-  const weightedSizing = (config.weightedSizing ?? false) && monthlyMode;
   const stepPrice = config.stepPrice;
 
   if (candles.length === 0 || stepPrice <= 0 || config.amountPerLevel <= 0) {
@@ -367,6 +304,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       dcaValue: 0,
       dcaPnl: 0,
       hybridNetPnl: 0,
+      finalFreeCash: initialAmount,
     };
   }
 
@@ -376,15 +314,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   const owned = new Map<number, OwnedSlot>();
   let totalProfit = 0;
   let amountPerLevel = config.amountPerLevel;
-  // Per-level $ snapshot when weighted sizing is on. Empty map means
-  // "use the uniform amountPerLevel". Refreshed at every monthly rebuild.
-  let levelAmounts = new Map<number, number>();
-  function amountForLevel(levelIndex: number): number {
-    if (levelAmounts.size > 0) {
-      return levelAmounts.get(levelIndex) ?? 0;
-    }
-    return amountPerLevel;
-  }
 
   // Monthly mode bookkeeping.
   let freeCapital = initialAmount;
@@ -463,7 +392,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
           owned.delete(levelIndex);
           tpProgress = true;
           if (!owned.has(tpIndex)) {
-            const chaseAmount = amountForLevel(tpIndex);
+            const chaseAmount = amountPerLevel;
             const enoughCapital = chaseAmount > 0 && (!monthlyMode || freeCapital >= chaseAmount);
             if (enoughCapital) {
               const chaseLevelPrice = tpIndex * stepPrice;
@@ -523,22 +452,6 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
         );
         const numLevels = Math.max(1, monthlyCeilingIndex - monthlyFloorIndex);
         amountPerLevel = freeCapital / numLevels;
-        if (weightedSizing) {
-          // Weights computed from candles[0..candleIdx] only — backtest
-          // stays causal, no peeking at future bars when sizing.
-          const weights = computeLevelWeights(
-            candles.slice(0, candleIdx + 1),
-            stepPrice,
-            monthlyFloorIndex + 1,
-            monthlyCeilingIndex
-          );
-          levelAmounts = new Map();
-          for (const [idx, weight] of weights) {
-            levelAmounts.set(idx, freeCapital * weight);
-          }
-        } else {
-          levelAmounts = new Map();
-        }
         lastMonthKey = monthKey;
       }
     }
@@ -571,12 +484,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       if (owned.has(levelIndex)) {
         continue;
       }
-      const fillAmount = amountForLevel(levelIndex);
-      if (fillAmount <= 0) {
-        // Weighted sizing zero-visit level — skip rather than place
-        // a no-op slot.
-        continue;
-      }
+      const fillAmount = amountPerLevel;
       if (monthlyMode && freeCapital < fillAmount) {
         break;
       }
@@ -669,6 +577,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     dcaValue,
     dcaPnl,
     hybridNetPnl: totalProfit + unrealizedPnl + dcaPnl,
+    finalFreeCash: freeCapital,
   };
 }
 
@@ -690,7 +599,6 @@ export function run(candles: Candle[], options: AlgoOptions): Signal[] {
     monthlyAmount: resolveMonthlyAmount(options),
     monthlyRangePct: resolveMonthlyRangePct(options),
     dcaAllocationPct: resolveDcaAllocationPct(options),
-    weightedSizing: resolveWeightedSizing(options),
   });
   return result.signals;
 }

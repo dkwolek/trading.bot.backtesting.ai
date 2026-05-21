@@ -7,7 +7,6 @@ import {
   resolveMonthlyMode,
   resolveMonthlyRangePct,
   resolveStepPrice,
-  resolveWeightedSizing,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
 import { simulateDCA } from '../../algos/dca.algo';
@@ -129,7 +128,6 @@ export default function AutoGridMetricsPanel() {
   const monthlyAmount = resolveMonthlyAmount(algoOptions);
   const monthlyRangePct = resolveMonthlyRangePct(algoOptions);
   const dcaAllocationPct = resolveDcaAllocationPct(algoOptions);
-  const weightedSizing = resolveWeightedSizing(algoOptions);
 
   const dca = useMemo(
     () => simulateDCA(candles, initialAmount, monthlyMode ? monthlyAmount : 0),
@@ -146,7 +144,6 @@ export default function AutoGridMetricsPanel() {
         monthlyAmount,
         monthlyRangePct,
         dcaAllocationPct,
-        weightedSizing,
       }),
     [
       candles,
@@ -157,7 +154,6 @@ export default function AutoGridMetricsPanel() {
       monthlyAmount,
       monthlyRangePct,
       dcaAllocationPct,
-      weightedSizing,
     ]
   );
 
@@ -179,7 +175,7 @@ export default function AutoGridMetricsPanel() {
     ? `monthly · ${simulation.monthlyResets} resets`
     : `peak concurrent · ${simulation.uniqueLevelsTraded} unique levels`;
   const hybridActive = monthlyMode && dcaAllocationPct > 0;
-  const showColumns = hybridActive ? 'grid-cols-6' : 'grid-cols-5';
+  const showColumns = hybridActive ? 'grid-cols-7' : 'grid-cols-6';
 
   return (
     <div className={`grid ${showColumns} gap-2`}>
@@ -246,6 +242,11 @@ export default function AutoGridMetricsPanel() {
         secondaryLabel="vs hodl-by-DCA"
         secondaryValue={formatDollarsSigned(dca.netPnl)}
         secondaryClass={pnlClass(dca.netPnl)}
+      />
+      <MetricCard
+        label="Free cash"
+        value={formatDollars(simulation.finalFreeCash)}
+        hint={`${((simulation.finalFreeCash / simulation.totalDeposited) * 100).toFixed(1)}% of deposited`}
       />
       {hybridActive && (
         <DualMetricCard
