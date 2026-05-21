@@ -44,10 +44,10 @@ export default function Chart({ pair, candles, trades }: Props) {
   }, [isAutoGrid, candles, stepPrice]);
 
   const dcaMarkers = useMemo(() => {
-    if (!isAutoGrid || candles.length === 0) {
+    if (!isAutoGrid || !monthlyMode || candles.length === 0) {
       return [];
     }
-    const dca = simulateDCA(candles, initialAmount, monthlyMode ? monthlyAmount : 0);
+    const dca = simulateDCA(candles, initialAmount, monthlyAmount);
     return dca.events.map((event) => ({ time: event.time, price: event.price }));
   }, [isAutoGrid, candles, initialAmount, monthlyMode, monthlyAmount]);
 
