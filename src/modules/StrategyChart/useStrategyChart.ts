@@ -42,6 +42,7 @@ function buildPriceLineData(candles: Candle[]): LineData<UTCTimestamp>[] {
 export function useStrategyChart(
   candles: Candle[] | undefined,
   primaryHistory: RealizedSnapshot[],
+  primaryUnrealizedHistory: RealizedSnapshot[],
   comparisonHistory: RealizedSnapshot[] | null,
   initialAmount: number
 ) {
@@ -165,11 +166,13 @@ export function useStrategyChart(
       primarySeriesRef.current.removePriceLine(priceLineRef.current);
     }
 
-    primarySeriesRef.current.setData(buildStrategyLineData(candles, primaryHistory, initialAmount));
+    primarySeriesRef.current.setData(
+      buildStrategyLineData(candles, primaryHistory, primaryUnrealizedHistory, initialAmount)
+    );
 
     if (comparisonSeriesRef.current && comparisonHistory) {
       comparisonSeriesRef.current.setData(
-        buildStrategyLineData(candles, comparisonHistory, initialAmount)
+        buildStrategyLineData(candles, comparisonHistory, [], initialAmount)
       );
     }
 
@@ -194,7 +197,7 @@ export function useStrategyChart(
       chartRef.current?.timeScale().fitContent();
       lastCandleCountRef.current = candles.length;
     }
-  }, [candles, primaryHistory, comparisonHistory, initialAmount]);
+  }, [candles, primaryHistory, primaryUnrealizedHistory, comparisonHistory, initialAmount]);
 
   return { chartPaneRef, hasCandles };
 }

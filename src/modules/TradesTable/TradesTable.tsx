@@ -110,7 +110,7 @@ const TradesTable = forwardRef<TradesTableHandle, Props>(function TradesTable({ 
   }));
 
   return (
-    <div className="flex flex-col gap-2 w-72 shrink-0 h-full min-h-0">
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
       <span className="text-[10px] font-semibold tracking-widest uppercase text-muted">
         {t.trades.title} {rows.length > 0 && `(${rows.length})`}
       </span>

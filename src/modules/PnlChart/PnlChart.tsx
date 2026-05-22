@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 import { useTradingContext } from '../../context/TradingContext';
-import ChartLineIcon from '../../components/Icons/ChartLineIcon';
-import t from '../../locales';
 import {
   resolveAmountPerLevel,
   resolveDcaAllocationPct,
@@ -11,14 +9,15 @@ import {
   resolveStepPrice,
   simulateAutoGrid,
 } from '../../algos/auto-grid.algo';
+import ChartLineIcon from '../../components/Icons/ChartLineIcon';
 import { Candle } from '../../types/global.types';
-import { useStrategyChart } from './useStrategyChart';
+import { usePnlChart } from './usePnlChart';
 
 interface Props {
   candles?: Candle[];
 }
 
-export default function StrategyChart({ candles }: Props) {
+export default function PnlChart({ candles }: Props) {
   const { initialAmount, algoOptions } = useTradingContext();
   const stepPrice = resolveStepPrice(algoOptions);
   const amountPerLevel = resolveAmountPerLevel(algoOptions);
@@ -29,7 +28,7 @@ export default function StrategyChart({ candles }: Props) {
 
   const histories = useMemo(() => {
     if (!candles || candles.length === 0) {
-      return { primary: [], primaryUnrealized: [], comparison: null };
+      return { realized: [], unrealized: [] };
     }
     const result = simulateAutoGrid(candles, {
       stepPrice,
@@ -40,11 +39,7 @@ export default function StrategyChart({ candles }: Props) {
       monthlyRangePct,
       dcaAllocationPct,
     });
-    return {
-      primary: result.realizedHistory,
-      primaryUnrealized: result.unrealizedHistory,
-      comparison: null,
-    };
+    return { realized: result.realizedHistory, unrealized: result.unrealizedHistory };
   }, [
     candles,
     stepPrice,
@@ -56,12 +51,10 @@ export default function StrategyChart({ candles }: Props) {
     dcaAllocationPct,
   ]);
 
-  const { chartPaneRef, hasCandles } = useStrategyChart(
+  const { chartPaneRef, hasCandles } = usePnlChart(
     candles,
-    histories.primary,
-    histories.primaryUnrealized,
-    histories.comparison,
-    initialAmount
+    histories.realized,
+    histories.unrealized
   );
 
   return (
@@ -73,7 +66,7 @@ export default function StrategyChart({ candles }: Props) {
       ) : (
         <div className="border border-border bg-surface h-[150px] flex flex-col items-center justify-center gap-2">
           <ChartLineIcon />
-          <span className="text-muted text-[11px]">{t.earningsChart.placeholder}</span>
+          <span className="text-muted text-[11px]">Run a simulation to see PnL</span>
         </div>
       )}
     </div>

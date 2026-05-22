@@ -6,6 +6,7 @@ import Chart from '../Chart/Chart';
 import LoadingIndicator from '../LoadingIndicator/LoadingIndicator';
 import BacktestingPlaceholder from './BacktestingPlaceholder/BacktestingPlaceholder';
 import StrategyChart from '../StrategyChart/StrategyChart';
+import PnlChart from '../PnlChart/PnlChart';
 import MetricsPanel from '../MetricsPanel/MetricsPanel';
 import AutoGridMetricsPanel from '../MetricsPanel/AutoGridMetricsPanel';
 import TradesTable from '../TradesTable/TradesTable';
@@ -33,18 +34,31 @@ export default function BacktestingView() {
           <Chart pair={selectedPair} candles={candles} trades={backtestResult?.trades} />
         </Collapsible>
         {error && <p className="text-red text-[13px]">{error}</p>}
-        <Collapsible id="metrics" title={t.metrics.title}>
-          {isAutoGrid ? (
-            <AutoGridMetricsPanel />
-          ) : (
+        {!isAutoGrid && (
+          <Collapsible id="metrics" title={t.metrics.title}>
             <MetricsPanel metrics={backtestResult?.metrics} />
-          )}
-        </Collapsible>
+          </Collapsible>
+        )}
         <Collapsible id="strategy" title={t.earningsChart.title}>
           <StrategyChart candles={candles} />
         </Collapsible>
+        {isAutoGrid && (
+          <Collapsible id="pnl" title="Realized vs Unrealized">
+            <PnlChart candles={candles} />
+          </Collapsible>
+        )}
       </div>
-      <TradesTable ref={tradesTableRef} trades={backtestResult?.trades} />
+      <div className="w-72 shrink-0 h-full min-h-0 flex flex-col gap-2">
+        {isAutoGrid && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-semibold tracking-widest uppercase text-muted">
+              {t.metrics.title}
+            </span>
+            <AutoGridMetricsPanel />
+          </div>
+        )}
+        <TradesTable ref={tradesTableRef} trades={backtestResult?.trades} />
+      </div>
     </div>
   );
 }

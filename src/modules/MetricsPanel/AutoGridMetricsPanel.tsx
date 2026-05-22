@@ -11,82 +11,19 @@ import {
 } from '../../algos/auto-grid.algo';
 import { simulateDCA } from '../../algos/dca.algo';
 
-interface MetricCardProps {
+interface MetricRowProps {
   label: string;
   value: string;
-  hint?: string;
-  positive?: boolean;
-  negative?: boolean;
-  warning?: boolean;
+  valueClass?: string;
 }
 
-function MetricCard({ label, value, hint, positive, negative, warning }: MetricCardProps) {
-  let valueColor = 'text-text';
-  if (positive) {
-    valueColor = 'text-green';
-  } else if (negative) {
-    valueColor = 'text-red';
-  } else if (warning) {
-    valueColor = 'text-yellow-400';
-  }
-
+function MetricRow({ label, value, valueClass = 'text-text' }: MetricRowProps) {
   return (
-    <div className="bg-surface border border-border p-3 flex flex-col justify-between gap-1 min-w-0">
-      <span
-        className="text-[10px] font-semibold tracking-widest uppercase text-muted truncate"
-        title={label}
-      >
+    <div className="flex justify-between items-baseline gap-2 py-0.5 border-b border-border/40 last:border-0">
+      <span className="text-[9px] font-semibold tracking-widest uppercase text-muted shrink-0">
         {label}
       </span>
-      <span className={`font-mono text-[13px] font-medium truncate ${valueColor}`}>{value}</span>
-      {hint && (
-        <span className="text-[9px] text-muted truncate" title={hint}>
-          {hint}
-        </span>
-      )}
-    </div>
-  );
-}
-
-interface DualMetricCardProps {
-  primaryLabel: string;
-  primaryValue: string;
-  primaryClass?: string;
-  secondaryLabel: string;
-  secondaryValue: string;
-  secondaryClass?: string;
-}
-
-function DualMetricCard({
-  primaryLabel,
-  primaryValue,
-  primaryClass = 'text-text',
-  secondaryLabel,
-  secondaryValue,
-  secondaryClass = 'text-text',
-}: DualMetricCardProps) {
-  return (
-    <div className="bg-surface border border-border p-3 flex flex-col gap-2 min-w-0">
-      <div className="flex flex-col min-w-0">
-        <span
-          className="text-[10px] font-semibold tracking-widest uppercase text-muted truncate"
-          title={primaryLabel}
-        >
-          {primaryLabel}
-        </span>
-        <span className={`font-mono text-[13px] font-medium truncate ${primaryClass}`}>
-          {primaryValue}
-        </span>
-      </div>
-      <div className="flex flex-col min-w-0">
-        <span
-          className="text-[9px] tracking-widest uppercase text-muted truncate"
-          title={secondaryLabel}
-        >
-          {secondaryLabel}
-        </span>
-        <span className={`font-mono text-[11px] truncate ${secondaryClass}`}>{secondaryValue}</span>
-      </div>
+      <span className={`font-mono text-[10px] font-medium truncate ${valueClass}`}>{value}</span>
     </div>
   );
 }
@@ -159,11 +96,11 @@ export default function AutoGridMetricsPanel() {
 
   if (candles.length === 0) {
     return (
-      <div className="grid grid-cols-4 gap-2">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="bg-surface border border-border p-3 flex flex-col gap-1">
-            <div className="h-3 w-16 bg-border rounded animate-pulse" />
-            <div className="h-4 w-12 bg-border rounded animate-pulse" />
+      <div className="flex flex-col gap-1">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="flex justify-between py-0.5">
+            <div className="h-2 w-14 bg-border rounded animate-pulse" />
+            <div className="h-2 w-12 bg-border rounded animate-pulse" />
           </div>
         ))}
       </div>
@@ -171,91 +108,45 @@ export default function AutoGridMetricsPanel() {
   }
 
   const requiredCapital = simulation.requiredCapitalActual;
-  const requiredLabel = monthlyMode
-    ? `monthly · ${simulation.monthlyResets} resets`
-    : `peak concurrent · ${simulation.uniqueLevelsTraded} unique levels`;
   const hybridActive = monthlyMode && dcaAllocationPct > 0;
-  const showColumns = hybridActive ? 'grid-cols-7' : 'grid-cols-6';
 
   return (
-    <div className={`grid ${showColumns} gap-2`}>
-      <DualMetricCard
-        primaryLabel="Net"
-        primaryValue={formatPercent(simulation.netPnl, requiredCapital)}
-        primaryClass={pnlClass(simulation.netPnl)}
-        secondaryLabel="Grid only $"
-        secondaryValue={`${simulation.netPnl >= 0 ? '+' : '-'}$${Math.abs(simulation.netPnl).toFixed(2)}`}
-        secondaryClass={pnlClass(simulation.netPnl)}
+    <div className="flex flex-col">
+      <MetricRow
+        label="Net"
+        value={`${formatPercent(simulation.netPnl, requiredCapital)}  ${formatDollarsSigned(simulation.netPnl)}`}
+        valueClass={pnlClass(simulation.netPnl)}
       />
-      <div className="bg-surface border border-border p-3 flex flex-col gap-2 min-w-0">
-        <div className="flex flex-col min-w-0">
-          <span className="text-[10px] font-semibold tracking-widest uppercase text-muted truncate">
-            Realized
-          </span>
-          <div className="flex items-baseline gap-2 min-w-0">
-            <span
-              className={`font-mono text-[13px] font-medium truncate ${pnlClass(simulation.totalProfit)}`}
-            >
-              {formatPercent(simulation.totalProfit, requiredCapital)}
-            </span>
-            <span className={`font-mono text-[11px] truncate ${pnlClass(simulation.totalProfit)}`}>
-              {formatDollarsSigned(simulation.totalProfit)}
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-[9px] tracking-widest uppercase text-muted truncate">
-            Unrealized
-          </span>
-          <div className="flex items-baseline gap-2 min-w-0">
-            <span
-              className={`font-mono text-[11px] font-medium truncate ${pnlClass(simulation.unrealizedPnl)}`}
-            >
-              {formatPercent(simulation.unrealizedPnl, requiredCapital)}
-            </span>
-            <span
-              className={`font-mono text-[10px] truncate ${pnlClass(simulation.unrealizedPnl)}`}
-            >
-              {formatDollarsSigned(simulation.unrealizedPnl)}
-            </span>
-          </div>
-        </div>
-      </div>
-      <DualMetricCard
-        primaryLabel="Required capital"
-        primaryValue={formatDollars(requiredCapital)}
-        secondaryLabel={requiredLabel}
-        secondaryValue={`Open ${formatDollars(simulation.openPositionsCost)}`}
-        secondaryClass={simulation.openPositionsCost > 0 ? 'text-yellow-400' : 'text-text'}
+      <MetricRow
+        label="Realized"
+        value={`${formatPercent(simulation.totalProfit, requiredCapital)}  ${formatDollarsSigned(simulation.totalProfit)}`}
+        valueClass={pnlClass(simulation.totalProfit)}
       />
-      <DualMetricCard
-        primaryLabel="Cycles"
-        primaryValue={String(simulation.completedCycles)}
-        secondaryLabel="Open at end"
-        secondaryValue={String(simulation.openPositionsAtEnd)}
-        secondaryClass={simulation.openPositionsAtEnd > 0 ? 'text-yellow-400' : 'text-text'}
+      <MetricRow
+        label="Unrealized"
+        value={`${formatPercent(simulation.unrealizedPnl, requiredCapital)}  ${formatDollarsSigned(simulation.unrealizedPnl)}`}
+        valueClass={pnlClass(simulation.unrealizedPnl)}
       />
-      <DualMetricCard
-        primaryLabel="DCA baseline"
-        primaryValue={`${dca.netPct >= 0 ? '+' : '-'}${Math.abs(dca.netPct).toFixed(2)}%`}
-        primaryClass={pnlClass(dca.netPnl)}
-        secondaryLabel="vs hodl-by-DCA"
-        secondaryValue={formatDollarsSigned(dca.netPnl)}
-        secondaryClass={pnlClass(dca.netPnl)}
+      <MetricRow label="Required" value={formatDollars(requiredCapital)} />
+      <MetricRow
+        label="Cycles"
+        value={`${simulation.completedCycles}  open: ${simulation.openPositionsAtEnd}`}
+        valueClass={simulation.openPositionsAtEnd > 0 ? 'text-yellow-400' : 'text-text'}
       />
-      <MetricCard
+      <MetricRow
         label="Free cash"
-        value={formatDollars(simulation.finalFreeCash)}
-        hint={`${((simulation.finalFreeCash / simulation.totalDeposited) * 100).toFixed(1)}% of deposited`}
+        value={`${formatDollars(simulation.finalFreeCash)}  ${((simulation.finalFreeCash / simulation.totalDeposited) * 100).toFixed(1)}%`}
+      />
+      <MetricRow
+        label="DCA baseline"
+        value={`${dca.netPct >= 0 ? '+' : '-'}${Math.abs(dca.netPct).toFixed(2)}%  ${formatDollarsSigned(dca.netPnl)}`}
+        valueClass={pnlClass(dca.netPnl)}
       />
       {hybridActive && (
-        <DualMetricCard
-          primaryLabel="Hybrid total"
-          primaryValue={formatPercent(simulation.hybridNetPnl, requiredCapital)}
-          primaryClass={pnlClass(simulation.hybridNetPnl)}
-          secondaryLabel={`grid + dca · ${dcaAllocationPct}%`}
-          secondaryValue={formatDollarsSigned(simulation.hybridNetPnl)}
-          secondaryClass={pnlClass(simulation.hybridNetPnl)}
+        <MetricRow
+          label="Hybrid"
+          value={`${formatPercent(simulation.hybridNetPnl, requiredCapital)}  ${formatDollarsSigned(simulation.hybridNetPnl)}`}
+          valueClass={pnlClass(simulation.hybridNetPnl)}
         />
       )}
     </div>

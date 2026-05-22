@@ -23,9 +23,9 @@ export const controls: ControlDef[] = [
     title: t.autoGridControls.stepPrice,
     type: 'slider',
     defaultValue: DEFAULT_STEP_PRICE,
-    min: 5,
-    max: 1000,
-    step: 5,
+    min: 2,
+    max: 2000,
+    step: 2,
     group: 'Levels',
   },
   {
@@ -155,6 +155,7 @@ export interface AutoGridSimulation {
   endTime: number;
   signals: Signal[];
   realizedHistory: RealizedSnapshot[];
+  unrealizedHistory: RealizedSnapshot[];
   uniqueLevelsTraded: number; // distinct level indices that had ≥ 1 buy
   requiredCapitalActual: number;
   totalDeposited: number; // initialAmount + monthly contributions
@@ -295,6 +296,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       endTime: 0,
       signals: [],
       realizedHistory: [],
+      unrealizedHistory: [],
       uniqueLevelsTraded: 0,
       requiredCapitalActual: 0,
       totalDeposited: initialAmount,
@@ -355,6 +357,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
   let maxCapital = 0;
   const signals: Signal[] = [];
   const realizedHistory: RealizedSnapshot[] = [];
+  const unrealizedHistory: RealizedSnapshot[] = [];
   const tradedLevels = new Set<number>();
 
   // TP scan + chase cascading. Called twice per candle (before fills
@@ -504,8 +507,10 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     }
 
     let capitalDeployed = 0;
+    let markToMarket = 0;
     for (const slot of owned.values()) {
       capitalDeployed += slot.cost;
+      markToMarket += slot.volume * candle.close;
     }
     if (capitalDeployed > maxCapital) {
       maxCapital = capitalDeployed;
@@ -514,6 +519,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
       sumBagCostOverTime += capitalDeployed;
       sumDepositedOverTime += totalDeposited;
     }
+    unrealizedHistory.push({ time: candle.time, cumulative: markToMarket - capitalDeployed });
 
     prevCloseIndex = Math.floor(candle.close / stepPrice);
   }
@@ -568,6 +574,7 @@ export function simulateAutoGrid(candles: Candle[], config: BotSimConfig): AutoG
     endTime: finalCandle.time,
     signals,
     realizedHistory,
+    unrealizedHistory,
     uniqueLevelsTraded: tradedLevels.size,
     requiredCapitalActual,
     totalDeposited,
